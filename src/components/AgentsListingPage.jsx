@@ -30,11 +30,11 @@ function Stars({ rating }) {
 /* ── Agent Card ───────────────────────────────────────────── */
 function AgentCard({ agent }) {
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)] hover:-translate-y-[3px] transition-all duration-200 group flex flex-col">
+    <div className="bg-white border border-[#E2E8F0] rounded-2xl hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)] hover:-translate-y-[3px] transition-all duration-200 group flex flex-col">
 
       {/* Cover */}
       <Link href={`/agents/${agent.id}`} className="block">
-        <div className="h-[72px] relative"
+        <div className="h-[72px] relative rounded-t-2xl overflow-hidden"
           style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E3A5F 60%, #0F6E56 100%)" }}>
           {agent.verified && (
             <span className="absolute top-3 right-3 bg-[#FFFBEB] border border-[#F59E0B]/40 text-[#92400E] text-[10px] font-bold px-2 py-[2px] rounded-full flex items-center gap-1">
@@ -51,11 +51,11 @@ function AgentCard({ agent }) {
           <Link href={`/agents/${agent.id}`}>
             <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${agent.grad}
               flex items-center justify-center text-lg font-extrabold text-white
-              border-[3px] border-white shadow-md select-none`}>
+              border-[3px] border-white shadow-md select-none relative z-10`}>
               {agent.initials}
             </div>
           </Link>
-          <div className="flex flex-col items-end gap-[2px]">
+          <div className="flex flex-col items-end gap-[2px] md:mt-8">
             <Stars rating={agent.rating} />
             <span className="text-[10px] text-[#94A3B8]">{agent.rating} ({agent.reviews})</span>
           </div>
