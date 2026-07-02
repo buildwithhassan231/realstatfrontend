@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 /* ── Nav links ────────────────────────────────────────────── */
 const NAV_LINKS = [
-  { label: "Buy",      href: "/properties" },
-  { label: "Rent",     href: "/properties?purpose=rent" },
-  { label: "Agents",   href: "/agents"     },
-  { label: "Projects", href: "/projects"   },
+  { label: "Buy",      href: "/properties?type=sale" },
+  { label: "Rent",     href: "/properties?type=rent" },
+  { label: "Agents",   href: "/agents"               },
+  { label: "Projects", href: "/projects"             },
 ];
 
 /* ── Role badge config ────────────────────────────────────── */
@@ -33,10 +33,29 @@ function dashboardHref(role) {
 }
 
 export default function Navbar() {
+  return (
+    <Suspense fallback={<NavbarSkeleton />}>
+      <NavbarContent />
+    </Suspense>
+  );
+}
+
+function NavbarSkeleton() {
+  return (
+    <>
+      <nav className="fixed top-0 left-0 right-0 z-50" style={{ background: "#0F172A", height: "68px" }} />
+      <div style={{ height: "68px" }} />
+    </>
+  );
+}
+
+function NavbarContent() {
   const { user, logout }      = useAuth();
   const pathname              = usePathname();
+  const searchParams          = useSearchParams();
   const router                = useRouter();
   const dropdownRef           = useRef(null);
+  const listingType           = searchParams.get("type");
 
   const [dropdownOpen,  setDropdownOpen]  = useState(false);
   const [mobileOpen,    setMobileOpen]    = useState(false);
@@ -77,9 +96,25 @@ export default function Navbar() {
     router.push("/login");
   }
 
-  /* Active link check */
+  /* Active link check — query-param aware */
   function isActive(href) {
-    return pathname === href || (href !== "/" && pathname.startsWith(href.split("?")[0]));
+    const [hPath, hQuery] = href.split("?");
+    if (pathname !== hPath && !(hPath !== "/" && pathname.startsWith(hPath))) return false;
+
+    // For /properties links, also check the ?type param
+    if (pathname === "/properties") {
+      if (!hQuery) {
+        // bare /properties — never active now (Buy/Rent both have ?type)
+        return false;
+      }
+      const hParams = new URLSearchParams(hQuery);
+      const hType   = hParams.get("type");
+      if (hType === "sale") return listingType === "sale" || listingType === null;
+      if (hType === "rent") return listingType === "rent";
+      return false;
+    }
+
+    return true;
   }
 
   const initials = user ? getInitials(user.name) : "";

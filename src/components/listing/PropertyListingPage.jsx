@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PropertyCard from "@/components/PropertyCard";
@@ -152,10 +153,49 @@ const TOTAL_PAGES = Math.ceil(ALL_PROPERTIES.length / ITEMS_PER_PAGE);
 
 /* ─── Main Component ────────────────────────────────────── */
 export default function PropertyListingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC]"><Navbar /></div>}>
+      <PropertyListingContent />
+    </Suspense>
+  );
+}
+
+function PropertyListingContent() {
+  const searchParams        = useSearchParams();
+  const router              = useRouter();
+  const urlType             = searchParams.get("type"); // "sale" | "rent" | null
+
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-  const [sort, setSort] = useState("newest");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [activeFilters, setActiveFilters] = useState(null);
+  const [sort,             setSort]             = useState("newest");
+  const [currentPage,      setCurrentPage]      = useState(1);
+  const [activeFilters,    setActiveFilters]    = useState(null);
+
+  /* Sync listingType filter from URL on mount / URL change */
+  useEffect(() => {
+    setActiveFilters(prev => ({
+      selectedTypes: prev?.selectedTypes ?? [],
+      listingType:   urlType === "rent" ? "rent" : urlType === "sale" ? "sale" : "all",
+      minPrice:      prev?.minPrice ?? "",
+      maxPrice:      prev?.maxPrice ?? "",
+      beds:          prev?.beds ?? null,
+      baths:         prev?.baths ?? null,
+      city:          prev?.city ?? "All Cities",
+    }));
+    setCurrentPage(1);
+  }, [urlType]);
+
+  /* Page heading based on URL type */
+  const heading = urlType === "sale"
+    ? "Properties For Sale"
+    : urlType === "rent"
+    ? "Properties For Rent"
+    : "All Properties";
+
+  const subheading = urlType === "sale"
+    ? "Find your dream property to buy"
+    : urlType === "rent"
+    ? "Find the perfect rental property"
+    : "Browse verified listings across Pakistan";
 
   /* Sort logic */
   function getSortedProperties() {
@@ -210,12 +250,18 @@ export default function PropertyListingPage() {
             <a href="/" className="hover:text-[#F59E0B] transition-colors">Home</a>
             <span>›</span>
             <span className="text-[#94A3B8]">Properties</span>
+            {urlType && (
+              <>
+                <span>›</span>
+                <span className="text-[#94A3B8] capitalize">{urlType === "sale" ? "For Sale" : "For Rent"}</span>
+              </>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white mb-1">
-            All Properties
+            {heading}
           </h1>
           <p className="text-[#94A3B8] text-sm">
-            Browse verified listings across Pakistan
+            {subheading}
           </p>
         </div>
       </div>
@@ -226,7 +272,13 @@ export default function PropertyListingPage() {
 
           {/* Sidebar */}
           <FilterSidebar
+            initialListingType={urlType === "rent" ? "rent" : urlType === "sale" ? "sale" : "all"}
             onApply={setActiveFilters}
+            onListingTypeChange={type => {
+              if (type === "all")  router.push("/properties");
+              else if (type === "sale") router.push("/properties?type=sale");
+              else if (type === "rent") router.push("/properties?type=rent");
+            }}
             mobileOpen={mobileFilterOpen}
             onMobileClose={() => setMobileFilterOpen(false)}
           />

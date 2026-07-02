@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const PROPERTY_TYPES = ["House", "Apartment", "Villa", "Plot", "Commercial"];
 const CITIES = [
@@ -15,14 +15,19 @@ const CITIES = [
   "Quetta",
 ];
 
-export default function FilterSidebar({ onApply, mobileOpen, onMobileClose }) {
+export default function FilterSidebar({ onApply, onListingTypeChange, initialListingType = "all", mobileOpen, onMobileClose }) {
   const [selectedTypes, setSelectedTypes] = useState([]);
-  const [listingType, setListingType] = useState("all");
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-  const [beds, setBeds] = useState(null);
-  const [baths, setBaths] = useState(null);
-  const [city, setCity] = useState("All Cities");
+  const [listingType,   setListingType]   = useState(initialListingType);
+  const [minPrice,      setMinPrice]      = useState("");
+  const [maxPrice,      setMaxPrice]      = useState("");
+  const [beds,          setBeds]          = useState(null);
+  const [baths,         setBaths]         = useState(null);
+  const [city,          setCity]          = useState("All Cities");
+
+  /* Sync listingType when URL changes (prop changes) */
+  useEffect(() => {
+    setListingType(initialListingType);
+  }, [initialListingType]);
 
   function toggleType(type) {
     setSelectedTypes((prev) =>
@@ -91,9 +96,9 @@ export default function FilterSidebar({ onApply, mobileOpen, onMobileClose }) {
         </p>
         <div className="flex flex-col gap-[10px]">
           {[
-            { value: "all", label: "Buy or Rent" },
-            { value: "sale", label: "For Sale" },
-            { value: "rent", label: "For Rent" },
+            { value: "all",  label: "Buy or Rent" },
+            { value: "sale", label: "For Sale"    },
+            { value: "rent", label: "For Rent"    },
           ].map((opt) => (
             <label key={opt.value} className="flex items-center gap-3 cursor-pointer group">
               <input
@@ -101,7 +106,10 @@ export default function FilterSidebar({ onApply, mobileOpen, onMobileClose }) {
                 name="listingType"
                 value={opt.value}
                 checked={listingType === opt.value}
-                onChange={() => setListingType(opt.value)}
+                onChange={() => {
+                  setListingType(opt.value);
+                  onListingTypeChange?.(opt.value);
+                }}
                 className="w-4 h-4 accent-[#F59E0B] cursor-pointer"
               />
               <span className="text-sm text-[#1E293B] group-hover:text-[#0F172A] transition-colors">
