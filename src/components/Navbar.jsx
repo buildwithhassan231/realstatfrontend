@@ -41,6 +41,10 @@ export default function Navbar() {
   const [dropdownOpen,  setDropdownOpen]  = useState(false);
   const [mobileOpen,    setMobileOpen]    = useState(false);
   const [scrolled,      setScrolled]      = useState(false);
+  const [mounted,       setMounted]       = useState(false);
+
+  /* Mark as mounted — auth state is now safe to read */
+  useEffect(() => { setMounted(true); }, []);
 
   /* Scroll effect */
   useEffect(() => {
@@ -125,7 +129,10 @@ export default function Navbar() {
 
           {/* ── RIGHT: Actions (desktop) ── */}
           <div className="hidden md:flex items-center gap-3 shrink-0">
-            {!user ? (
+            {/* Render placeholder until mounted to avoid hydration mismatch */}
+            {!mounted ? (
+              <div className="w-[168px] h-[34px]" />
+            ) : !user ? (
               <>
                 {/* Login */}
                 <Link
@@ -257,8 +264,8 @@ export default function Navbar() {
         >
           <div className="px-5 py-5 flex flex-col gap-2">
 
-            {/* Logged-in: user card */}
-            {user && (
+            {/* Logged-in: user card — only after mount */}
+            {mounted && user && (
               <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-[#F59E0B] text-[#0F172A] text-sm font-extrabold
                   flex items-center justify-center shrink-0 select-none">
@@ -293,8 +300,8 @@ export default function Navbar() {
 
             <hr className="border-white/10 my-1" />
 
-            {/* Auth links */}
-            {!user ? (
+            {/* Auth links — only render after mount to avoid hydration mismatch */}
+            {!mounted ? null : !user ? (
               <div className="flex flex-col gap-2 pt-1">
                 <Link href="/login"
                   className="w-full text-center py-[10px] rounded-full border border-white/30 text-white text-sm font-medium no-underline hover:bg-white hover:text-[#0F172A] transition-all">
