@@ -8,6 +8,9 @@ const NAV = [
   { icon: "📊", label: "Overview",           href: "/admin"             },
   { icon: "👥", label: "Manage Users",        href: "/admin/users"       },
   { icon: "🏠", label: "Manage Properties",   href: "/admin/properties"  },
+  { icon: "💬", label: "Manage Inquiries",    href: "/admin/inquiries"   },
+  { icon: "🏷️", label: "Categories",          href: "/admin/categories"  },
+  { icon: "⚙️", label: "Settings",            href: "/admin/settings"    },
 ];
 
 export default function AdminSidebar() {
