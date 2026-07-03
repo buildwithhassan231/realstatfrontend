@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 /* ── Constants ─────────────────────────────────────────── */
 const FEATURES = [
@@ -65,12 +66,14 @@ function Field({ label, id, error, children }) {
 /* ── Main component ────────────────────────────────────── */
 export default function RegisterPage() {
   const router = useRouter();
+  const { register } = useAuth();
   const [role, setRole]     = useState("buyer");
   const [showPw, setShowPw]   = useState(false);
   const [showCpw, setShowCpw] = useState(false);
   const [agreed, setAgreed]   = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors]   = useState({});
+  const [apiError, setApiError] = useState("");
 
   const [form, setForm] = useState({
     firstName: "", lastName: "",
@@ -103,12 +106,30 @@ export default function RegisterPage() {
     return e;
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
-    setTimeout(() => setLoading(false), 2000);
+    setApiError("");
+    try {
+      const payload = {
+        name: `${form.firstName.trim()} ${form.lastName.trim()}`,
+        email: form.email,
+        password: form.password,
+        phoneNumber: form.phone.replace(/\s+/g, "").replace("+", ""),
+        role,
+        ...(role === "agent" && { agencyName: form.agencyName, city: form.city }),
+      };
+      const userData = await register(payload);
+      if (userData.role === "admin")       router.replace("/admin");
+      else if (userData.role === "agent")  router.replace("/dashboard");
+      else router.replace("/"); // buyer → homepage
+    } catch (err) {
+      setApiError(err.message || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -211,6 +232,12 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+            {/* API error banner */}
+            {apiError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
+                <span>⚠️</span> {apiError}
+              </div>
+            )}
 
             {/* ── Row 1: First Name + Last Name ─────────── */}
             <div className="grid grid-cols-2 gap-4">

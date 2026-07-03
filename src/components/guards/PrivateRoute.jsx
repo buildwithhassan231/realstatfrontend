@@ -5,21 +5,21 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 /**
- * Wraps any agent-only page.
+ * Wraps any authenticated-only page.
  * Redirects to /login if not authenticated.
  */
 export default function PrivateRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!isLoading && !isAuthenticated) {
       router.replace("/login");
     }
-  }, [user, loading, router]);
+  }, [isAuthenticated, isLoading, router]);
 
-  if (loading) return <LoadingScreen />;
-  if (!user)   return null; // redirect in progress
+  if (isLoading) return <LoadingScreen />;
+  if (!isAuthenticated) return null;
 
   return children;
 }
@@ -29,19 +29,19 @@ export default function PrivateRoute({ children }) {
  * Redirects to / if not admin.
  */
 export function AdminRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (!user)                  router.replace("/login");
-      else if (user.role !== "admin") router.replace("/");
+    if (!isLoading) {
+      if (!isAuthenticated)          router.replace("/login");
+      else if (user?.role !== "admin") router.replace("/");
     }
-  }, [user, loading, router]);
+  }, [user, isAuthenticated, isLoading, router]);
 
-  if (loading)                return <LoadingScreen />;
-  if (!user)                  return null;
-  if (user.role !== "admin")  return null;
+  if (isLoading)                          return <LoadingScreen />;
+  if (!isAuthenticated)                   return null;
+  if (user?.role !== "admin")             return null;
 
   return children;
 }

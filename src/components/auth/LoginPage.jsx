@@ -24,20 +24,24 @@ export default function LoginPage() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!form.email || !form.password) {
       setError("Please fill in all fields.");
       return;
     }
     setLoading(true);
-    // Simulate login — replace with real API call
-    setTimeout(() => {
-      const role = form.email.includes("admin") ? "admin" : "agent";
-      login({ name: "Ahmed Khan", email: form.email, role, token: "demo-token-123" });
-      router.replace(role === "admin" ? "/admin" : "/dashboard");
+    setError("");
+    try {
+      const userData = await login({ email: form.email, password: form.password });
+      if (userData.role === "admin")  router.replace("/admin");
+      else if (userData.role === "agent") router.replace("/dashboard");
+      else router.replace("/"); // buyer → homepage
+    } catch (err) {
+      setError(err.message || "Invalid email or password.");
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   }
 
   return (
