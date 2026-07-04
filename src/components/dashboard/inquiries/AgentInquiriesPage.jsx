@@ -1,71 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Pagination from "@/components/listing/Pagination";
-
-/* ── Sample data ──────────────────────────────────────────── */
-const SAMPLE = [
-  {
-    id: 1,
-    initials: "UT", avatarGrad: "from-[#185FA5] to-[#0C447C]",
-    name: "Usman Tariq",   email: "usman.tariq@gmail.com",   phone: "+92 300 1112233",
-    property: "Modern 5-Bed House in DHA Phase 6",
-    propEmoji: "🏡", propGrad: "from-[#1D9E75] to-[#0F6E56]",
-    date: "Today, 10:24 AM",
-    message: "Hi, I'm very interested in this property. Can we schedule a visit this weekend? I'd like to bring my family along to have a look. Please let me know a suitable time and any documents I should bring.",
-    status: "unread",
-  },
-  {
-    id: 2,
-    initials: "SM", avatarGrad: "from-[#BE185D] to-[#9D174D]",
-    name: "Sara Malik",    email: "sara.malik@outlook.com",  phone: "+92 321 9876543",
-    property: "Luxury Apartment Clifton Block 4",
-    propEmoji: "🏢", propGrad: "from-[#185FA5] to-[#0C447C]",
-    date: "Today, 08:05 AM",
-    message: "Is the apartment still available for rent? I am looking for immediate possession from next month. Could you please share more photos of the kitchen and bathrooms?",
-    status: "unread",
-  },
-  {
-    id: 3,
-    initials: "BR", avatarGrad: "from-[#0F6E56] to-[#064E3B]",
-    name: "Bilal Raza",    email: "bilal.raza@yahoo.com",    phone: "+92 333 4455667",
-    property: "10 Marla Residential Plot — Bahria",
-    propEmoji: "🏗️", propGrad: "from-[#4F46E5] to-[#7C3AED]",
-    date: "Yesterday, 3:15 PM",
-    message: "What is the exact location of the plot? Is it near the main gate or inner sector? Also is the price negotiable? I'm a serious buyer.",
-    status: "read",
-  },
-  {
-    id: 4,
-    initials: "AK", avatarGrad: "from-[#854F0B] to-[#92400E]",
-    name: "Asim Khan",     email: "asim.khan@hotmail.com",   phone: "+92 311 2223344",
-    property: "Premium Villa with Pool — Bahria Town",
-    propEmoji: "🏖️", propGrad: "from-[#854F0B] to-[#F59E0B]",
-    date: "28 Jun, 11:00 AM",
-    message: "I visited the villa last week and I'm very impressed. I'd like to discuss the final price and payment terms. When can we meet to proceed with the paperwork?",
-    status: "responded",
-  },
-  {
-    id: 5,
-    initials: "FN", avatarGrad: "from-[#6D28D9] to-[#4C1D95]",
-    name: "Fatima Noor",   email: "fatima.noor@gmail.com",   phone: "+92 345 6677889",
-    property: "Commercial Shop — Main Boulevard Lahore",
-    propEmoji: "🏪", propGrad: "from-[#BE185D] to-[#9D174D]",
-    date: "27 Jun, 2:30 PM",
-    message: "Is this shop available for rent on a long-term lease? We are looking for a minimum 3-year agreement. What is the security deposit required?",
-    status: "read",
-  },
-  {
-    id: 6,
-    initials: "ZA", avatarGrad: "from-[#0369A1] to-[#075985]",
-    name: "Zara Ahmed",    email: "zara.ahmed@gmail.com",    phone: "+92 312 8899001",
-    property: "2-Bed Apartment — F-10 Islamabad",
-    propEmoji: "🏢", propGrad: "from-[#0369A1] to-[#075985]",
-    date: "26 Jun, 9:45 AM",
-    message: "Hello, I saw your listing online. Can you confirm whether utilities (gas, electricity) are included in the rent? Also is there covered parking available for residents?",
-    status: "responded",
-  },
-];
+import axiosClient from "@/lib/axiosClient";
 
 const ITEMS_PER_PAGE = 4;
 
@@ -77,6 +14,31 @@ const STATUS_CFG = {
 };
 
 const TABS = ["all", "unread", "read", "responded"];
+
+/* ── Map API response item to component shape ────────────── */
+function mapInquiry(item) {
+  const buyer = item.buyer || item.buyerInfo || {};
+  const prop  = item.property || {};
+  const name  = buyer.name || item.buyerName || "Unknown";
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  return {
+    id:        item._id || item.id,
+    initials,
+    avatarGrad: "from-[#185FA5] to-[#0C447C]",   // default gradient
+    name,
+    email:     buyer.email || item.buyerEmail || "—",
+    phone:     buyer.phoneNumber || buyer.phone || item.buyerPhone || "—",
+    property:  prop.title || item.propertyTitle || "—",
+    propEmoji: "🏠",
+    propGrad:  "from-[#0F172A] to-[#1E3A5F]",
+    date:      item.createdAt
+      ? new Date(item.createdAt).toLocaleString("en-PK", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })
+      : "—",
+    message:   item.message || "",
+    status:    item.status || "unread",
+  };
+}
 
 /* ── Inquiry Card ─────────────────────────────────────────── */
 function InquiryCard({ inq, onMarkRead, onMarkResponded }) {
@@ -179,7 +141,31 @@ export default function AgentInquiriesPage() {
   const [activeTab,   setActiveTab]   = useState("all");
   const [search,      setSearch]      = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [inquiries,   setInquiries]   = useState(SAMPLE);
+  const [inquiries,   setInquiries]   = useState([]);
+  const [isLoading,   setIsLoading]   = useState(true);
+  const [apiError,    setApiError]    = useState("");
+
+  /* ── Fetch on mount ── */
+  useEffect(() => {
+    fetchInquiries();
+  }, []);
+
+  async function fetchInquiries() {
+    setIsLoading(true);
+    setApiError("");
+    try {
+      const res = await axiosClient.get(
+        "/inquiries/received/my-listings",
+        { params: { page: 1, limit: 100 } }   // fetch all, paginate client-side
+      );
+      const raw = res.data?.data || res.data || [];
+      setInquiries(Array.isArray(raw) ? raw.map(mapInquiry) : []);
+    } catch (err) {
+      setApiError(err.response?.data?.message || "Failed to load inquiries.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   const counts = useMemo(() => ({
     all:       inquiries.length,
@@ -213,7 +199,7 @@ export default function AgentInquiriesPage() {
         <div>
           <h2 className="text-xl font-extrabold text-[#0F172A]">All Inquiries</h2>
           <p className="text-xs text-[#94A3B8] mt-[2px]">
-            {filtered.length} {filtered.length === 1 ? "inquiry" : "inquiries"} found
+            {isLoading ? "Loading..." : `${filtered.length} ${filtered.length === 1 ? "inquiry" : "inquiries"} found`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -222,38 +208,60 @@ export default function AgentInquiriesPage() {
               {counts.unread} unread
             </span>
           )}
+          <button onClick={fetchInquiries}
+            className="border border-[#E2E8F0] text-[#64748B] text-xs font-semibold px-3 py-[9px] rounded-xl hover:bg-[#F8FAFC] transition-colors">
+            🔄 Refresh
+          </button>
           <div className="relative w-full sm:w-[280px]">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none text-sm">&#128269;</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none text-sm">🔍</span>
             <input type="text" value={search} onChange={e => handleSearch(e.target.value)}
               placeholder="Search by buyer or property..."
               className="w-full border border-[#E2E8F0] rounded-xl pl-9 pr-4 py-[9px] text-sm text-[#1E293B] outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all placeholder:text-[#CBD5E1] bg-white" />
             {search && (
               <button onClick={() => handleSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] text-sm">x</button>
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] text-sm">✕</button>
             )}
           </div>
         </div>
       </div>
 
+      {/* API error */}
+      {apiError && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+          <span>⚠️</span> {apiError}
+          <button onClick={fetchInquiries} className="ml-auto text-xs font-semibold underline">Retry</button>
+        </div>
+      )}
+
+      {/* Loading spinner */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-16 gap-3">
+          <div className="w-8 h-8 border-4 border-[#F59E0B] border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-[#94A3B8]">Loading inquiries...</span>
+        </div>
+      )}
+
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] rounded-xl p-1 w-fit flex-wrap">
-        {TABS.map(tab => (
-          <button key={tab} onClick={() => handleTabChange(tab)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 capitalize
-              ${activeTab === tab ? "bg-[#F59E0B] text-[#0F172A]" : "text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]"}`}>
-            {tab}
-            {counts[tab] > 0 && (
-              <span className={`text-[10px] font-bold px-[7px] py-[1px] rounded-full
-                ${activeTab === tab ? "bg-[#0F172A]/20 text-[#0F172A]" : tab === "unread" ? "bg-red-100 text-red-600" : "bg-[#F1F5F9] text-[#475569]"}`}>
-                {counts[tab]}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      {!isLoading && (
+        <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] rounded-xl p-1 w-fit flex-wrap">
+          {TABS.map(tab => (
+            <button key={tab} onClick={() => handleTabChange(tab)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 capitalize
+                ${activeTab === tab ? "bg-[#F59E0B] text-[#0F172A]" : "text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]"}`}>
+              {tab}
+              {counts[tab] > 0 && (
+                <span className={`text-[10px] font-bold px-[7px] py-[1px] rounded-full
+                  ${activeTab === tab ? "bg-[#0F172A]/20 text-[#0F172A]" : tab === "unread" ? "bg-red-100 text-red-600" : "bg-[#F1F5F9] text-[#475569]"}`}>
+                  {counts[tab]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Inquiry list */}
-      {paginated.length > 0 ? (
+      {!isLoading && (paginated.length > 0 ? (
         <div className="flex flex-col gap-4">
           {paginated.map(inq => (
             <InquiryCard key={inq.id} inq={inq} onMarkRead={markRead} onMarkResponded={markResponded} />
@@ -261,13 +269,13 @@ export default function AgentInquiriesPage() {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-24 text-center bg-white rounded-2xl border border-[#E2E8F0]">
-          <span className="text-5xl mb-4">&#128172;</span>
+          <span className="text-5xl mb-4">💬</span>
           <p className="font-bold text-[#0F172A] text-base mb-1">No inquiries found</p>
           <p className="text-sm text-[#64748B]">
             {search ? "Try a different search term" : "No inquiries in this category yet"}
           </p>
         </div>
-      )}
+      ))}
 
       {/* Pagination */}
       {totalPages > 1 && (

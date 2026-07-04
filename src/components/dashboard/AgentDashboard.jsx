@@ -7,17 +7,17 @@ import ListingsTable from "@/components/dashboard/ListingsTable";
 import RecentInquiries from "@/components/dashboard/RecentInquiries";
 
 const QUICK_ACTIONS = [
-  { icon: "➕", label: "Add Property",   href: "/dashboard/add", color: "bg-[#F59E0B] text-[#0F172A]" },
-  { icon: "💬", label: "View Inquiries", href: "/dashboard/inquiries",    color: "bg-[#0F172A] text-white" },
-  { icon: "📋", label: "My Listings",    href: "/dashboard/listings",     color: "bg-white text-[#0F172A] border border-[#E2E8F0]" },
-  { icon: "⚙️", label: "Settings",       href: "/dashboard/profile",      color: "bg-white text-[#0F172A] border border-[#E2E8F0]" },
+  { icon: "➕", label: "Add Property",   href: "/dashboard/add",       color: "bg-[#F59E0B] text-[#0F172A]" },
+  { icon: "💬", label: "View Inquiries", href: "/dashboard/inquiries", color: "bg-[#0F172A] text-white" },
+  { icon: "📋", label: "My Listings",    href: "/dashboard/listings",  color: "bg-white text-[#0F172A] border border-[#E2E8F0]" },
+  { icon: "⚙️", label: "Settings",       href: "/dashboard/profile",   color: "bg-white text-[#0F172A] border border-[#E2E8F0]" },
 ];
 
-export default function AgentDashboard() {
+export default function AgentDashboard({ listings = [], isLoading = false, error = "" }) {
   const { user } = useAuth();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const firstName = user?.name?.split(" ")[0] || "Ahmed";
+  const firstName = user?.name?.split(" ")[0] || "Agent";
 
   return (
     <div className="flex flex-col gap-6">
@@ -41,7 +41,7 @@ export default function AgentDashboard() {
         ))}
       </div>
 
-      <ListingsTable />
+      <ListingsTable listings={listings} isLoading={isLoading} error={error} />
       <RecentInquiries />
     </div>
   );
