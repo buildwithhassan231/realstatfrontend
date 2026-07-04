@@ -76,9 +76,10 @@ export default function MyListingsPage() {
     setApiError("");
     try {
       const res = await axiosClient.get("/properties/user/my-properties");
-      // Response: { success: true, total: n, data: [...] }
-      const data = res.data?.data || res.data || [];
-      setListings(Array.isArray(data) ? data : []);
+      // Handle both { success, data: [...] } and direct array responses
+      const raw = res.data?.data ?? res.data ?? [];
+      const data = Array.isArray(raw) ? raw : [];
+      setListings(data);
     } catch (err) {
       if (err.response?.status === 401) {
         localStorage.removeItem("token");
@@ -103,15 +104,27 @@ export default function MyListingsPage() {
 
   /* ── Filter ── */
   const filtered = useMemo(() => {
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
     return listings.filter(l => {
+      // Search — empty string means match all
       const matchSearch = !q
         || l.title?.toLowerCase().includes(q)
         || l.city?.toLowerCase().includes(q)
         || l.address?.toLowerCase().includes(q);
-      const matchStatus = statusFilter === "All"
-        || (statusFilter === "pending" ? l.approvalStatus === "pending" : l.status === statusFilter);
-      const matchType   = typeFilter === "All" || l.propertyType === typeFilter;
+
+      // Status — "All" always passes
+      let matchStatus = true;
+      if (statusFilter !== "All") {
+        if (statusFilter === "pending") {
+          matchStatus = l.approvalStatus === "pending";
+        } else {
+          matchStatus = l.status === statusFilter;
+        }
+      }
+
+      // Type — "All" always passes
+      const matchType = typeFilter === "All" || l.propertyType === typeFilter;
+
       return matchSearch && matchStatus && matchType;
     });
   }, [listings, searchQuery, statusFilter, typeFilter]);
@@ -230,8 +243,8 @@ export default function MyListingsPage() {
       {/* ── GRID VIEW ── */}
       {!isLoading && viewMode === "grid" && filtered.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map(l => {
-            const id    = l._id || l.id;
+          {filtered.map((l) => {
+            const id    = l._id?.toString() || l.id?.toString();
             const img   = l.images?.[0]?.url;
             const emoji = typeEmoji(l.propertyType);
             const price = formatPrice(l.price, l.listingType);
@@ -329,8 +342,8 @@ export default function MyListingsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
-                {filtered.map(l => {
-                  const id    = l._id || l.id;
+                {filtered.map((l) => {
+                  const id    = l._id?.toString() || l.id?.toString();
                   const img   = l.images?.[0]?.url;
                   const emoji = typeEmoji(l.propertyType);
                   const price = formatPrice(l.price, l.listingType);
