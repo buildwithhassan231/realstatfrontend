@@ -6,6 +6,8 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import axiosClient from "@/lib/axiosClient";
+import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
 
 /* ── Helpers ─────────────────────────────────────────────── */
 function formatPrice(price) {
@@ -52,13 +54,16 @@ const AMENITY_LIST = [
 /* ── Main component ──────────────────────────────────────── */
 export default function PropertyDetailPage() {
   const { id }    = useParams();
+  const { user, isAuthenticated } = useAuth();
+  const { isFavorited, toggleFavorite } = useFavorites();
   const [property, setProperty] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error,     setError]     = useState("");
-  const [saved,     setSaved]     = useState(false);
   const [activeImg, setActiveImg] = useState(0);
-  const [inquiryForm, setInquiryForm] = useState({ name:"", email:"", phone:"", message:"" });
-  const [inquirySent, setInquirySent] = useState(false);
+  const [inquiryForm,  setInquiryForm]  = useState({ message: "" });
+  const [inquirySent,  setInquirySent]  = useState(false);
+  const [inquiryErr,   setInquiryErr]   = useState("");
+  const [isSending,    setIsSending]    = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -111,14 +116,24 @@ export default function PropertyDetailPage() {
 
   async function handleInquiry(e) {
     e.preventDefault();
+    setInquiryErr("");
+
+    // Validation — only message is required
+    if (!inquiryForm.message.trim()) {
+      setInquiryErr("Please write a message before sending.");
+      return;
+    }
+
+    setIsSending(true);
     try {
       await axiosClient.post(`/inquiries/${p._id || p.id}`, {
-        message:    inquiryForm.message,
-        buyerPhone: inquiryForm.phone,
+        message: inquiryForm.message.trim(),
       });
       setInquirySent(true);
-    } catch {
-      setInquirySent(true); // show success anyway for UX
+    } catch (err) {
+      setInquiryErr(err.response?.data?.message || "Failed to send inquiry. Please try again.");
+    } finally {
+      setIsSending(false);
     }
   }
 
@@ -202,10 +217,16 @@ export default function PropertyDetailPage() {
             <div className="text-3xl font-extrabold text-[#0F172A]">{priceStr}</div>
             {perSqft && <div className="text-xs text-[#94A3B8]">{perSqft} / sqft</div>}
             <div className="flex items-center gap-2">
-              <button onClick={() => setSaved(!saved)}
+              <button
+                onClick={() => {
+                  if (!isAuthenticated) { window.location.href = "/login"; return; }
+                  toggleFavorite(p._id || p.id);
+                }}
                 className={`flex items-center gap-1 text-xs font-semibold px-3 py-[7px] rounded-lg border transition-all
-                  ${saved ? "bg-[#FFFBEB] border-[#F59E0B] text-[#92400E]" : "bg-white border-[#E2E8F0] text-[#64748B] hover:border-[#F59E0B]"}`}>
-                {saved ? "❤️ Saved" : "🤍 Save"}
+                  ${isFavorited(p._id || p.id)
+                    ? "bg-[#FFFBEB] border-[#F59E0B] text-[#92400E]"
+                    : "bg-white border-[#E2E8F0] text-[#64748B] hover:border-[#F59E0B]"}`}>
+                {isFavorited(p._id || p.id) ? "❤️ Saved" : "🤍 Save"}
               </button>
               <button className="flex items-center gap-1 text-xs font-semibold px-3 py-[7px] rounded-lg border border-[#E2E8F0] bg-white text-[#64748B] hover:border-[#F59E0B] transition-colors">
                 🔗 Share
@@ -326,40 +347,79 @@ export default function PropertyDetailPage() {
               <div className="bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden">
                 <div className="bg-gradient-to-br from-[#0F172A] to-[#1E3A5F] px-5 py-4">
                   <p className="font-extrabold text-white text-sm">Send Inquiry</p>
-                  <p className="text-white/60 text-xs mt-[2px]">Get details from the agent</p>
+                  <p className="text-white/60 text-xs mt-[2px]">Ask the agent about this property</p>
                 </div>
 
                 {inquirySent ? (
+                  /* ── Success state ── */
                   <div className="p-5 text-center flex flex-col items-center gap-2">
                     <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-2xl">✅</div>
                     <p className="font-bold text-[#0F172A]">Inquiry Sent!</p>
                     <p className="text-xs text-[#64748B]">The agent will contact you soon.</p>
+                    <button onClick={() => { setInquirySent(false); setInquiryForm({ message: "" }); }}
+                      className="mt-1 text-xs font-semibold text-[#F59E0B] hover:text-[#D97706] transition-colors">
+                      Send another →
+                    </button>
+                  </div>
+                ) : !isAuthenticated ? (
+                  /* ── Not logged in ── */
+                  <div className="p-5 text-center flex flex-col items-center gap-3">
+                    <span className="text-3xl">🔒</span>
+                    <p className="text-sm font-semibold text-[#0F172A]">Login to send an inquiry</p>
+                    <p className="text-xs text-[#64748B]">You need to be logged in as a buyer</p>
+                    <Link href="/login"
+                      className="w-full text-center bg-[#F59E0B] hover:bg-[#D97706] text-[#0F172A] font-bold text-sm py-[10px] rounded-xl transition-colors no-underline">
+                      Login
+                    </Link>
+                  </div>
+                ) : user?.role === "agent" || user?.role === "admin" ? (
+                  /* ── Agent/Admin cannot inquire ── */
+                  <div className="p-5 text-center">
+                    <p className="text-xs text-[#94A3B8]">Only buyers can send inquiries.</p>
                   </div>
                 ) : (
+                  /* ── Inquiry form (buyer only) ── */
                   <form onSubmit={handleInquiry} className="p-5 flex flex-col gap-3">
-                    {[
-                      { id:"name",    label:"Your Name",  type:"text",  ph:"Ahmed Khan"         },
-                      { id:"email",   label:"Email",       type:"email", ph:"you@email.com"      },
-                      { id:"phone",   label:"Phone",       type:"tel",   ph:"+92 300 0000000"    },
-                    ].map(f => (
-                      <div key={f.id}>
-                        <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider mb-1">{f.label}</label>
-                        <input type={f.type} placeholder={f.ph} required
-                          value={inquiryForm[f.id]}
-                          onChange={e => setInquiryForm(p => ({ ...p, [f.id]: e.target.value }))}
-                          className="w-full border border-[#E2E8F0] rounded-xl px-3 py-[9px] text-sm text-[#1E293B] outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all placeholder:text-[#CBD5E1]" />
+                    {/* Error banner */}
+                    {inquiryErr && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-3 py-2 flex items-center gap-2">
+                        <span>⚠️</span> {inquiryErr}
                       </div>
-                    ))}
+                    )}
+
+                    {/* Message — required */}
                     <div>
-                      <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider mb-1">Message</label>
-                      <textarea rows={3} placeholder="I'm interested in this property..."
+                      <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider mb-1">
+                        Message <span className="text-red-400">*</span>
+                      </label>
+                      <textarea
+                        rows={4}
+                        required
+                        placeholder="Hello, I am interested in this property. Is it still available? Please contact me."
                         value={inquiryForm.message}
-                        onChange={e => setInquiryForm(p => ({ ...p, message: e.target.value }))}
-                        className="w-full border border-[#E2E8F0] rounded-xl px-3 py-[9px] text-sm text-[#1E293B] outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all placeholder:text-[#CBD5E1] resize-none" />
+                        onChange={e => { setInquiryForm({ message: e.target.value }); setInquiryErr(""); }}
+                        className={`w-full border rounded-xl px-3 py-[9px] text-sm text-[#1E293B] outline-none transition-all placeholder:text-[#CBD5E1] resize-none
+                          ${inquiryErr ? "border-red-300 focus:ring-2 focus:ring-red-100" : "border-[#E2E8F0] focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20"}`}
+                      />
+                      <p className="text-[10px] text-[#94A3B8] mt-1 text-right">{inquiryForm.message.length}/500</p>
                     </div>
-                    <button type="submit"
-                      className="w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#0F172A] font-bold text-sm py-3 rounded-xl transition-colors">
-                      Send Inquiry
+
+                    <button
+                      type="submit"
+                      disabled={isSending || !inquiryForm.message.trim()}
+                      className={`w-full font-bold text-sm py-3 rounded-xl transition-colors
+                        ${isSending || !inquiryForm.message.trim()
+                          ? "bg-[#FCD34D] text-[#92400E] cursor-not-allowed"
+                          : "bg-[#F59E0B] hover:bg-[#D97706] text-[#0F172A]"}`}>
+                      {isSending ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                          </svg>
+                          Sending...
+                        </span>
+                      ) : "💬 Send Inquiry"}
                     </button>
                   </form>
                 )}

@@ -245,18 +245,20 @@ function NavbarContent() {
 
                       {/* Menu items */}
                       <div className="py-2">
-                        <DropItem href={dashboardHref(user.role)} icon="🏠" label="My Dashboard" />
-
-                        {user.role === "agent" && (
-                          <DropItem href="/dashboard/listings" icon="📋" label="My Listings" />
-                        )}
-                        {user.role === "buyer" && (
+                        {user.role === "buyer" ? (
+                          /* Buyer — only Favorites */
                           <DropItem href="/favorites" icon="❤️" label="Saved Properties" />
+                        ) : (
+                          /* Agent / Admin */
+                          <>
+                            <DropItem href={dashboardHref(user.role)} icon="🏠" label="My Dashboard" />
+                            {user.role === "agent" && (
+                              <DropItem href="/dashboard/listings" icon="📋" label="My Listings" />
+                            )}
+                            <DropItem href="/dashboard/profile" icon="👤" label="Profile Settings" />
+                          </>
                         )}
-
-                        <DropItem href="/dashboard/profile" icon="👤" label="Profile Settings" />
                       </div>
-
                       <hr className="border-[#F1F5F9]" />
 
                       {/* Logout */}
