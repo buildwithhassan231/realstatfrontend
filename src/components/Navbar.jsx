@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
 
 /* ── Nav links ────────────────────────────────────────────── */
 const NAV_LINKS = [
@@ -51,6 +52,7 @@ function NavbarSkeleton() {
 
 function NavbarContent() {
   const { user, logout }      = useAuth();
+  const { count: favCount }   = useFavorites();
   const pathname              = usePathname();
   const searchParams          = useSearchParams();
   const router                = useRouter();
@@ -188,6 +190,17 @@ function NavbarContent() {
               </>
             ) : (
               <>
+                {/* Favorites icon */}
+                <Link href="/favorites" title="Saved Properties"
+                  className="relative w-9 h-9 flex items-center justify-center rounded-full border border-white/20 text-white hover:bg-white/10 transition-colors no-underline">
+                  <span className="text-base">❤️</span>
+                  {favCount > 0 && (
+                    <span className="absolute -top-[5px] -right-[5px] min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center px-[4px] border-2 border-[#0F172A]">
+                      {favCount > 99 ? "99+" : favCount}
+                    </span>
+                  )}
+                </Link>
+
                 {/* Post Property */}
                 <Link
                   href="/dashboard/add"
@@ -353,6 +366,18 @@ function NavbarContent() {
                 {user.role === "agent" && <MobileItem href="/dashboard/listings" icon="📋" label="My Listings" />}
                 {user.role === "buyer" && <MobileItem href="/favorites" icon="❤️" label="Saved Properties" />}
                 <MobileItem href="/dashboard/profile" icon="👤" label="Profile Settings" />
+                <Link href="/favorites"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[#94A3B8] no-underline hover:bg-white/5 hover:text-white transition-colors duration-150">
+                  <span className="text-base w-5 text-center relative">
+                    ❤️
+                    {favCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center px-[2px]">
+                        {favCount > 99 ? "99+" : favCount}
+                      </span>
+                    )}
+                  </span>
+                  Saved Properties {favCount > 0 && `(${favCount})`}
+                </Link>
                 <Link href="/dashboard/add"
                   className="w-full text-center py-[10px] mt-1 rounded-full bg-[#F59E0B] text-[#0F172A] text-sm font-bold no-underline hover:bg-[#D97706] transition-all">
                   + Post Property
