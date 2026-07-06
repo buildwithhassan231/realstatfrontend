@@ -1,373 +1,188 @@
-# PropFind — Pakistan's #1 Property Platform
+# 🏡 PropFind — Premium Real Estate Ecosystem
 
-> A full-featured real estate web application built with **Next.js 16**, **React 19**, and **Tailwind CSS v4**.  
-> Search, list, and manage properties across Pakistan — for buyers, agents, and admins.
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Pages & Routes](#pages--routes)
-- [Features](#features)
-  - [Public Pages](#public-pages)
-  - [Agent Dashboard](#agent-dashboard)
-  - [Admin Panel](#admin-panel)
-- [Authentication & Access Control](#authentication--access-control)
-- [Getting Started](#getting-started)
-- [Scripts](#scripts)
-- [Key Components](#key-components)
-- [Styling Conventions](#styling-conventions)
+> A state-of-the-art, production-ready real estate management platform optimized for the Pakistani property market. Built using **Next.js 16 (Turbopack)**, **React 19**, and **Tailwind CSS v4** for a high-performance, visual-first user experience.
 
 ---
 
-## Overview
+## 📌 Table of Contents
 
-PropFind is a modern property listing platform targeting the Pakistani real estate market.  
-It supports three user roles — **Buyer**, **Agent**, and **Admin** — each with their own dedicated interface.
-
-- **Buyers** browse and search properties, view details, and send inquiries.
-- **Agents** manage their own listings, track inquiries, and update their profile.
-- **Admins** have full oversight: approve/reject listings, manage users, handle all inquiries, and control featured properties.
-
----
-
-## Tech Stack
-
-| Layer        | Technology                          |
-|--------------|-------------------------------------|
-| Framework    | Next.js 16 (App Router)             |
-| UI Library   | React 19                            |
-| Styling      | Tailwind CSS v4                     |
-| Auth         | Context API + localStorage          |
-| Language     | JavaScript (JSX)                    |
-| Linting      | ESLint (eslint-config-next)         |
-| Build Tool   | Next.js built-in (Turbopack)        |
+- [🚀 Key Features](#-key-features)
+- [💻 Tech Stack](#-tech-stack)
+- [📂 Project Architecture](#-project-architecture)
+- [🔌 API Integration Layer](#-api-integration-layer)
+- [🛡️ Security \& Auth Guard System](#️-security--auth-guard-system)
+- [🛠️ Getting Started](#️-getting-started)
+- [⚙️ Available Scripts](#️-available-scripts)
+- [🎨 Design & Styling Guidelines](#-design--styling-guidelines)
 
 ---
 
-## Project Structure
+## 🚀 Key Features
 
-```
+PropFind supports a robust role-based dashboard ecosystem mapping three core scopes: **Buyer**, **Agent**, and **Administrator**.
+
+### 👑 Premium Admin Console (`/admin`)
+* **Real-time Business Intelligence**: Dashboard overview stats mapped directly from the backend API `/admin/stats`.
+* **Dynamic Analytics**: Scaling charts representing user registration trajectories and properties listed per month, rendering actual data.
+* **Instant Export Engine**: Compile administrative summaries and active agent metrics into a CSV spreadsheet download.
+* **User Management (`/admin/users`)**: Search, filter, promote, block, and delete buyers/agents with instant confirmation safeguards.
+* **Property Inspection Center (`/admin/properties`)**: Review queue featuring Approve/Reject workflows (with custom reason inputs like *"Images are not clear"*), featured status toggles, and deletion.
+* **Category Configuration (`/admin/categories`)**: Dynamic category manager to add, edit, or toggle property visibility, with dynamic emoji auto-rendering.
+
+### 💼 Agent Workspace (`/dashboard`)
+* **Inquiry Dashboard**: Receive real-time client inquiry notifications and mark responses.
+* **Listing Studio**: Add and edit property records complete with image galleries, pricing configurations, and metadata specs.
+* **Profile Settings**: Update biography, specialized agency names, and upload profile pictures.
+
+### 🌐 Public Portal
+* **Omni-Search Bar**: Advanced filter sidebar containing query parameters for price, locations, property specs, and type.
+* **Wishlists**: Persisted user-favorite bookmarks.
+
+---
+
+## 💻 Tech Stack
+
+| Layer | Technology | Description |
+|---|---|---|
+| **Core Framework** | Next.js 16 (App Router) | High-performance routing, Turbopack, and SSR/CSR flexibility. |
+| **View Layer** | React 19 | Declarative state, modern hooks (`useCallback`, `useMemo`). |
+| **Styling Engine** | Tailwind CSS v4 | Utility-first classes with transition-micro-animations. |
+| **API Client** | Axios | Custom interceptors, error boundaries, and token authorization. |
+| **State Management** | Context API | Global authentication provider (`AuthContext`). |
+
+---
+
+## 📂 Project Architecture
+
+```bash
 src/
-├── app/                        # Next.js App Router pages
-│   ├── page.js                 # Homepage
-│   ├── layout.js               # Root layout (AuthProvider, fonts)
-│   ├── globals.css             # Global styles
-│   ├── not-found.js            # 404 page
-│   ├── login/                  # /login
-│   ├── register/               # /register
-│   ├── properties/             # /properties (listing + detail)
-│   │   └── [id]/               # /properties/:id
-│   ├── agents/                 # /agents (listing + profile)
-│   │   └── [id]/               # /agents/:id
-│   ├── projects/               # /projects
-│   ├── dashboard/              # Agent dashboard (protected)
-│   │   ├── page.js             # Overview
-│   │   ├── listings/           # My listings
-│   │   ├── add/                # Add new property
-│   │   ├── edit-property/[id]/ # Edit a property
-│   │   ├── inquiries/          # Agent's inquiries
-│   │   └── profile/            # Agent profile settings
-│   └── admin/                  # Admin panel (admin-only)
-│       ├── page.js             # Admin overview
-│       ├── users/              # Manage users
-│       ├── properties/         # Manage all properties
-│       ├── inquiries/          # Manage all inquiries
-│       ├── categories/         # Manage categories
-│       └── settings/           # Platform settings
-│
-├── components/
-│   ├── Navbar.jsx              # Top navigation bar
-│   ├── Hero.jsx                # Homepage hero section
-│   ├── Categories.jsx          # Category cards
-│   ├── FeaturedProperties.jsx  # Featured listings grid
-│   ├── Stats.jsx               # Platform statistics
-│   ├── HowItWorks.jsx          # Steps section
-│   ├── Footer.jsx              # Site footer
-│   ├── PropertyCard.jsx        # Reusable property card
-│   ├── AgentsListingPage.jsx   # Agents directory page
-│   ├── AgentProfilePage.jsx    # Individual agent page
-│   ├── auth/
-│   │   ├── LoginPage.jsx
-│   │   └── RegisterPage.jsx
-│   ├── detail/                 # Property detail page components
-│   │   ├── PropertyDetailPage.jsx
-│   │   ├── PropertyGallery.jsx
-│   │   ├── PropertySpecs.jsx
-│   │   ├── PropertyAmenities.jsx
-│   │   ├── PropertyLocation.jsx
-│   │   ├── AgentSidebar.jsx
-│   │   └── SimilarProperties.jsx
-│   ├── listing/                # Property listing page components
-│   │   ├── PropertyListingPage.jsx
-│   │   ├── FilterSidebar.jsx
-│   │   ├── ListingTopBar.jsx
-│   │   └── Pagination.jsx
-│   ├── dashboard/              # Agent dashboard components
-│   │   ├── AgentDashboard.jsx
-│   │   ├── AgentDashboardLayout.jsx
-│   │   ├── DashboardSidebar.jsx
-│   │   ├── DashboardStats.jsx
-│   │   ├── ListingsTable.jsx
-│   │   ├── RecentInquiries.jsx
-│   │   ├── StatusBadge.jsx
-│   │   ├── DeleteModal.jsx
-│   │   ├── add/                # Add/Edit property form components
-│   │   └── inquiries/          # Agent inquiries page
-│   ├── admin/                  # Admin panel components
-│   │   ├── AdminDashboard.jsx
-│   │   ├── AdminSidebar.jsx
-│   │   ├── ManagePropertiesPage.jsx
-│   │   ├── ManageUsersPage.jsx
-│   │   └── ManageInquiriesPage.jsx
-│   ├── projects/               # Projects / off-plan section
-│   └── guards/
-│       └── PrivateRoute.jsx    # Auth + role guards
-│
+├── app/                        # Next.js App Router (File-system routes)
+│   ├── page.js                 # Portal Homepage
+│   ├── layout.js               # Global Providers wrapper (Auth, styles)
+│   ├── login/                  # User Sign-In route
+│   ├── register/               # User Registration route
+│   ├── properties/             # Public property list & detailed pages
+│   ├── agents/                 # Public agent profiles directory
+│   ├── dashboard/              # Protected Agent Workspace route
+│   └── admin/                  # Protected Admin Administration Console
+│       ├── users/              # /admin/users route
+│       ├── properties/         # /admin/properties route
+│       ├── categories/         # /admin/categories route
+│       └── inquiries/          # /admin/inquiries route
+├── components/                 # Reusable functional React components
+│   ├── admin/                  # Admin-specific modules (Dashboard, Sidebars, Users, Listings)
+│   ├── dashboard/              # Agent workspaces components
+│   ├── guards/                 # PrivateRoute & RoleGuard components
+│   ├── Navbar.jsx              # Universal responsive navigation bar
+│   └── Footer.jsx              # Universal site footer
 ├── context/
-│   └── AuthContext.jsx         # Global auth state
-│
-└── data/
-    └── agents.js               # Static agent data (mock)
+│   └── AuthContext.jsx         # Context provider for session state
+├── lib/
+│   └── adminApi.js             # Consolidated Admin HTTP request wrapper client
 ```
 
 ---
 
-## Pages & Routes
+## 🔌 API Integration Layer
 
-| Route                          | Access        | Description                              |
-|-------------------------------|---------------|------------------------------------------|
-| `/`                            | Public        | Homepage with hero, featured, categories |
-| `/properties`                  | Public        | Browse all properties with filters       |
-| `/properties/:id`              | Public        | Full property detail page                |
-| `/agents`                      | Public        | Browse all agents                        |
-| `/agents/:id`                  | Public        | Agent profile with their listings        |
-| `/projects`                    | Public        | Off-plan / new projects section          |
-| `/login`                       | Public        | Login form                               |
-| `/register`                    | Public        | Registration form                        |
-| `/dashboard`                   | Agent only    | Agent dashboard overview                 |
-| `/dashboard/listings`          | Agent only    | View & manage own listings               |
-| `/dashboard/add`               | Agent only    | Add a new property listing               |
-| `/dashboard/edit-property/:id` | Agent only    | Edit an existing listing                 |
-| `/dashboard/inquiries`         | Agent only    | View all buyer inquiries                 |
-| `/dashboard/profile`           | Agent only    | Edit agent profile                       |
-| `/admin`                       | Admin only    | Admin overview with charts & stats       |
-| `/admin/users`                 | Admin only    | Manage all users                         |
-| `/admin/properties`            | Admin only    | Manage all property listings             |
-| `/admin/inquiries`             | Admin only    | Manage all buyer inquiries               |
-| `/admin/categories`            | Admin only    | Manage property categories               |
-| `/admin/settings`              | Admin only    | Platform settings                        |
+All backend endpoints are integrated in [adminApi.js](file:///c:/Projects/realstate/fontend/src/lib/adminApi.js) utilizing an Axios client:
 
----
+### 📊 System Stats & Dashboard
+* `GET /admin/stats` - Fetch platform-wide summary metrics.
+* `GET /admin/users` - Paginated administrative directory query (supports filters: `role`, `isBlocked`, `search`, `page`, `limit`).
 
-## Features
+### 👥 User Mutations
+* `GET /admin/users/:id` - Fetch comprehensive details for user preview.
+* `PUT /admin/users/:id/block` - Block/unblock access.
+* `PUT /admin/users/:id/promote` - Promote buyer to agent status.
+* `DELETE /admin/users/:id` - Permanent database user removal.
 
-### Public Pages
+### 🏢 Property Actions
+* `GET /properties/admin/pending` - Retrieve listing approval queue.
+* `PUT /properties/admin/:id/approve` - Approve property for public portal.
+* `PUT /properties/admin/:id/reject` - Reject property with custom reason body payload (`{ reason: string }`).
+* `PUT /properties/admin/:id/featured` - Toggle feature status.
+* `DELETE /properties/admin/:id` - Deletion mutation.
 
-**Homepage**
-- Hero section with search bar
-- Property category cards (House, Apartment, Plot, Villa, Commercial)
-- Featured properties grid
-- Platform statistics (users, listings, cities, agents)
-- How It Works steps
-- Footer with links
-
-**Property Listing (`/properties`)**
-- Grid of property cards with emoji thumbnails
-- Filter sidebar: type, city, price range, bedrooms, purpose (sale/rent)
-- Sort options
-- Pagination
-- Each card shows: price, title, location, beds, baths, area, purpose badge, featured badge, wishlist toggle
-
-**Property Detail (`/properties/:id`)**
-- Full image gallery
-- Property specs (beds, baths, area, floor)
-- Amenities list
-- Location map placeholder
-- Similar properties
-- Agent contact sidebar with inquiry form
-
-**Agents Directory (`/agents`)**
-- Agent cards with name, specialty, listings count, location
-- Click through to individual agent profile
-
-**Projects (`/projects`)**
-- Off-plan / new development listings
-- Register Interest modal
+### 🏷️ Categories Setup
+* `GET /admin/categories` - Fetch all categories.
+* `POST /admin/categories` - Create new listing categories (`name`, `description`, `isActive`).
+* `PUT /admin/categories/:id` - Update category information.
+* `DELETE /admin/categories/:id` - Remove listing category.
 
 ---
 
-### Agent Dashboard
+## 🛡️ Security & Auth Guard System
 
-Protected behind authentication. Only accessible to users with `role: "agent"`.
+PropFind uses Next.js layout guards to restrict routes based on user credentials.
 
-| Feature              | Details                                                    |
-|----------------------|------------------------------------------------------------|
-| Overview             | Stats: total listings, active, sold/rented, total inquiries |
-| My Listings          | Table with search, status filter, edit and delete actions  |
-| Add Property         | Multi-section form with title, type, price, location, description, amenities, image upload |
-| Edit Property        | Pre-filled form to update any existing listing             |
-| Inquiries            | Cards with buyer details, message, property thumbnail, mark read/responded actions |
-| Profile              | Update name, phone, bio, profile photo                     |
+```jsx
+// src/components/guards/PrivateRoute.jsx
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
----
+export function RoleGuard({ children, allowedRoles = [] }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-### Admin Panel
-
-Protected behind authentication. Only accessible to users with `role: "admin"`.
-
-**Overview (`/admin`)**
-- 4 stat cards: Total Users, Total Properties, Total Inquiries, Revenue
-- Bar chart — properties listed per month
-- Line chart — user registrations per month
-- Quick action buttons: Add Featured, Block User, Approve Pending, Export Report
-- Recent Activity table with per-row approve action
-
-**Manage Properties (`/admin/properties`)**
-- Full table of all properties on the platform
-- Search by title or agent name
-- Filter by: property type, status (available / pending / sold / rented), city
-- Pending properties highlighted with amber background
-- Pending approval banner with "Review Now" shortcut
-- Per-row actions:
-  - 👁️ View live listing
-  - ✓ Approve (pending only)
-  - ✕ Reject (pending only)
-  - ⭐ Toggle Featured on/off
-  - 🗑️ Delete with confirmation modal
-- Pagination (6 per page)
-
-**Manage Users (`/admin/users`)**
-- Table of all registered users (buyers, agents, admins)
-- Search by name or email
-- Filter by role and status
-- Bulk select with block/delete actions
-- Per-row actions:
-  - 👁️ View profile
-  - 🚫 Block / ✅ Unblock
-  - ⬆️ Promote buyer to agent
-  - 🗑️ Delete (non-admin users only)
-- All destructive actions require confirmation modal
-- Pagination (6 per page)
-
-**Manage Inquiries (`/admin/inquiries`)**
-- Full table of all buyer inquiries across all agents
-- Stats row: Total, Unread, Read, Responded
-- Unread alert banner linking to unread tab
-- Tab filters: All / Unread / Read / Responded
-- Search by buyer name, email, or property
-- Filter by agent
-- Per-row actions:
-  - 👁️ Mark as Read (unread only)
-  - ✅ Mark as Responded
-  - 🗑️ Delete with confirmation modal
-- Expandable message preview
-- Pagination (5 per page)
-
----
-
-## Authentication & Access Control
-
-Auth state is managed globally via React Context and persisted in `localStorage`.
-
-```js
-// User object stored in localStorage as "propfind_user"
-{
-  name: "Hassan Ali",
-  email: "hassan.ali@propfind.pk",
-  role: "admin"  // "buyer" | "agent" | "admin"
+  if (loading) return <LoadingSkeleton />;
+  if (!user || !allowedRoles.includes(user.role)) {
+    router.push("/login");
+    return null;
+  }
+  return children;
 }
 ```
 
-**Route Guards** (`src/components/guards/PrivateRoute.jsx`):
-
-- `<PrivateRoute>` — redirects to `/login` if no user session
-- `<AdminRoute>` — redirects to `/` if user is not an admin
-
-Both guards show a spinner while auth state is loading from localStorage.
-
 ---
 
-## Getting Started
+## 🛠️ Getting Started
 
-**Prerequisites:** Node.js 18+ and npm
+Follow these steps to run the PropFind frontend locally:
 
+### 1. Prerequisite Installations
+* Node.js v18.0 or newer
+* npm v9.0 or newer
+
+### 2. Install Project Dependencies
 ```bash
-# 1. Clone the repository
-git clone <repo-url>
-cd fontend
-
-# 2. Install dependencies
+# Clone the repository and install packages
+git clone <repository-url>
+cd realstate/fontend
 npm install
+```
 
-# 3. Start the development server
+### 3. Local Configuration
+Create a `.env.local` file in the root directory:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000/api
+```
+
+### 4. Boot Dev Server
+```bash
+# Launch Next.js dev server on port 3000
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+---
 
-**To access the admin panel**, log in with a user that has `role: "admin"` set in localStorage:
+## ⚙️ Available Scripts
 
-```js
-// Open browser console and run:
-localStorage.setItem("propfind_user", JSON.stringify({
-  name: "Super Admin",
-  email: "admin@propfind.pk",
-  role: "admin"
-}))
-// Then refresh the page and navigate to /admin
-```
+Execute the following commands in the project directory:
+
+* `npm run dev` - Launches the Next.js development server using **Turbopack** compilation.
+* `npm run build` - Compiles the project for deployment.
+* `npm start` - Launches the built production Next.js instance.
+* `npm run lint` - Runs ESLint code-quality analyses.
 
 ---
 
-## Scripts
+## 🎨 Design & Styling Guidelines
 
-| Command         | Description                              |
-|----------------|------------------------------------------|
-| `npm run dev`   | Start development server (localhost:3000) |
-| `npm run build` | Build for production                     |
-| `npm start`     | Start production server                  |
-| `npm run lint`  | Run ESLint                               |
+* **Harmonious Color Archetypes**: Sleek dark slate (`#0F172A`), rich gold highlights (`#F59E0B`), and vibrant emerald green (`#0F6E56`).
+* **Hover-State Transitions**: Interactive buttons use `transition-all duration-200 hover:-translate-y-[1px]` for responsive micro-interactions.
+* **Component Outlines**: Card elements use border styles `#E2E8F0` and `rounded-2xl` corners.
+* **Skeleton Loaders**: Premium UI blocks render Tailwind CSS `animate-pulse` gradient blocks to optimize perceived performance during loading states.
 
 ---
-
-## Key Components
-
-### `PropertyCard.jsx`
-Reusable card used on the homepage and listing page. Accepts a `property` prop with: `id`, `title`, `price`, `priceUnit`, `location`, `beds`, `baths`, `area`, `emoji`, `gradient`, `purpose`, `featured`, `liked`.
-
-### `Pagination.jsx`
-Generic pagination component. Props: `currentPage`, `totalPages`, `onPageChange`.
-
-### `AuthContext.jsx`
-Provides `user`, `loading`, `login(userData)`, `logout()` to the entire app.
-
-### `AdminSidebar.jsx`
-Dark sidebar for all admin pages with active link highlighting and logout.
-
-### `DashboardSidebar.jsx`
-Sidebar for agent dashboard pages with role-based navigation.
-
----
-
-## Styling Conventions
-
-- All colors use hex values from a consistent design palette:
-  - Primary gold: `#F59E0B`
-  - Dark navy: `#0F172A`
-  - Brand green: `#0F6E56`
-  - Body text: `#1E293B`
-  - Muted: `#94A3B8`
-  - Borders: `#E2E8F0`
-  - Background: `#F8FAFC`
-- Rounded corners: `rounded-xl` (12px) or `rounded-2xl` (16px)
-- All interactive elements have `transition-colors` or `transition-all`
-- Mobile-first responsive layout using Tailwind breakpoints (`sm:`, `lg:`)
-- Sticky sidebars on desktop, slide-in drawer on mobile
-
----
-
-> Built with ❤️ for the Pakistani real estate market.
+> Made with ❤️ for the Pakistani property market.
