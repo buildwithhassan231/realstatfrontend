@@ -1,23 +1,27 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import {
+  fetchAdminCategories,
+  createCategory as apiCreateCategory,
+  updateCategory as apiUpdateCategory,
+  deleteCategory as apiDeleteCategory,
+} from "@/lib/adminApi";
 
-/* ── Default categories (matches Categories.jsx) ─────────── */
-const INITIAL = [
-  { id: 1, icon: "🏡", name: "House",      slug: "house",      count: 142, active: true  },
-  { id: 2, icon: "🏢", name: "Apartment",  slug: "apartment",  count: 89,  active: true  },
-  { id: 3, icon: "🏖️", name: "Villa",      slug: "villa",      count: 34,  active: true  },
-  { id: 4, icon: "🏗️", name: "Plot",       slug: "plot",       count: 211, active: true  },
-  { id: 5, icon: "🏪", name: "Commercial", slug: "commercial", count: 67,  active: true  },
-];
+const INITIAL = [];
 
-/* ── Popular emoji picks for the picker ─────────────────── */
-const EMOJI_OPTIONS = [
-  "🏡","🏢","🏖️","🏗️","🏪","🏘️","🏚️","🏠","🏛️","🏬",
-  "🏭","🏰","🏯","🏟️","⛺","🛖","🏕️","🏙️","🌆","🌇",
-  "🏦","🏥","🏨","🏫","🏩","💒","🏤","🏣","🏧","🏺",
-];
+function getCategoryEmoji(name = "") {
+  const n = name.toLowerCase();
+  if (n.includes("house")) return "🏡";
+  if (n.includes("apartment") || n.includes("flat")) return "🏢";
+  if (n.includes("villa")) return "🏖️";
+  if (n.includes("plot") || n.includes("land")) return "🏗️";
+  if (n.includes("commercial") || n.includes("shop") || n.includes("office")) return "🏪";
+  return "🏷️";
+}
+
+
 
 /* ── Slug generator ──────────────────────────────────────── */
 function toSlug(str) {
@@ -51,21 +55,24 @@ function ConfirmModal({ title, message, confirmLabel, confirmStyle, onConfirm, o
 
 /* ── Add / Edit Modal ────────────────────────────────────── */
 function CategoryModal({ mode, initial, onSave, onClose }) {
-  const [name,    setName]    = useState(initial?.name ?? "");
-  const [icon,    setIcon]    = useState(initial?.icon ?? "🏡");
-  const [picking, setPicking] = useState(false);
-  const [err,     setErr]     = useState("");
+  const [name,        setName]        = useState(initial?.name ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [err,         setErr]         = useState("");
 
   function handleSave() {
-    const trimmed = name.trim();
-    if (!trimmed) { setErr("Category name is required."); return; }
-    if (trimmed.length < 2) { setErr("Name must be at least 2 characters."); return; }
-    onSave({ name: trimmed, icon, slug: toSlug(trimmed) });
+    const trimmedName = name.trim();
+    if (!trimmedName) { setErr("Category name is required."); return; }
+    if (trimmedName.length < 2) { setErr("Name must be at least 2 characters."); return; }
+    onSave({
+      name: trimmedName,
+      description: description.trim(),
+      isActive: initial ? initial.isActive : true
+    });
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl w-full max-w-md mx-4 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl w-full max-w-md mx-4 shadow-2xl overflow-hidden border border-[#E2E8F0]">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#F1F5F9]">
@@ -74,7 +81,7 @@ function CategoryModal({ mode, initial, onSave, onClose }) {
               {mode === "add" ? "Add New Category" : "Edit Category"}
             </h3>
             <p className="text-xs text-[#94A3B8] mt-[2px]">
-              {mode === "add" ? "Create a new property type" : "Update category details"}
+              {mode === "add" ? "Create a new property category" : "Update category details"}
             </p>
           </div>
           <button onClick={onClose}
@@ -83,38 +90,7 @@ function CategoryModal({ mode, initial, onSave, onClose }) {
           </button>
         </div>
 
-        <div className="px-6 py-5 flex flex-col gap-5">
-
-          {/* Icon picker */}
-          <div>
-            <label className="block text-xs font-bold text-[#475569] uppercase tracking-wider mb-2">
-              Category Icon
-            </label>
-            <button
-              onClick={() => setPicking(!picking)}
-              className="flex items-center gap-3 border border-[#E2E8F0] rounded-xl px-4 py-3 w-full hover:border-[#F59E0B] transition-colors group">
-              <span className="text-3xl">{icon}</span>
-              <span className="text-sm text-[#64748B] group-hover:text-[#0F172A] transition-colors">
-                {picking ? "Close picker ↑" : "Pick an emoji ↓"}
-              </span>
-            </button>
-
-            {picking && (
-              <div className="mt-2 p-3 border border-[#E2E8F0] rounded-xl bg-[#F8FAFC]">
-                <div className="grid grid-cols-10 gap-1">
-                  {EMOJI_OPTIONS.map(e => (
-                    <button
-                      key={e}
-                      onClick={() => { setIcon(e); setPicking(false); }}
-                      className={`w-9 h-9 rounded-lg text-xl flex items-center justify-center transition-all hover:scale-110
-                        ${icon === e ? "bg-[#F59E0B]/20 ring-2 ring-[#F59E0B]" : "hover:bg-white"}`}>
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="px-6 py-5 flex flex-col gap-4">
 
           {/* Name input */}
           <div>
@@ -126,7 +102,7 @@ function CategoryModal({ mode, initial, onSave, onClose }) {
               value={name}
               onChange={e => { setName(e.target.value); setErr(""); }}
               onKeyDown={e => e.key === "Enter" && handleSave()}
-              placeholder="e.g. Penthouse, Farm House..."
+              placeholder="e.g. Luxury Villa, Studio Apartment..."
               maxLength={30}
               className={`w-full border rounded-xl px-4 py-3 text-sm text-[#1E293B] outline-none transition-all
                 placeholder:text-[#CBD5E1]
@@ -135,20 +111,23 @@ function CategoryModal({ mode, initial, onSave, onClose }) {
                   : "border-[#E2E8F0] focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20"}`}
             />
             {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
-            <p className="text-[11px] text-[#94A3B8] mt-1">Slug: /{toSlug(name || "...")}</p>
           </div>
 
-          {/* Preview */}
+          {/* Description input */}
           <div>
             <label className="block text-xs font-bold text-[#475569] uppercase tracking-wider mb-2">
-              Preview
+              Description
             </label>
-            <div className="border border-[#E2E8F0] rounded-xl p-5 px-3 text-center bg-white w-[100px]">
-              <div className="text-[28px] mb-2">{icon}</div>
-              <div className="text-sm font-semibold text-[#1E293B] truncate">{name || "Name"}</div>
-              <div className="text-[11px] text-[#94A3B8] mt-[2px]">0 listings</div>
-            </div>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="e.g. Modern apartments and flats..."
+              rows={3}
+              maxLength={200}
+              className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm text-[#1E293B] outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all placeholder:text-[#CBD5E1] bg-white resize-none"
+            />
           </div>
+
         </div>
 
         {/* Footer */}
@@ -168,77 +147,48 @@ function CategoryModal({ mode, initial, onSave, onClose }) {
 }
 
 /* ── Draggable Row ───────────────────────────────────────── */
-function CategoryRow({ cat, index, total, onMoveUp, onMoveDown, onEdit, onDelete, onToggle }) {
+function CategoryRow({ cat, index, onEdit, onDelete, onToggle }) {
   return (
     <tr className="group hover:bg-[#F8FAFC] transition-colors">
 
-      {/* Drag handle + order */}
-      <td className="px-5 py-4 w-14">
-        <div className="flex items-center gap-2">
-          <span className="text-[#CBD5E1] group-hover:text-[#94A3B8] transition-colors cursor-grab text-base select-none">
-            ⠿
-          </span>
-          <span className="text-xs font-bold text-[#94A3B8]">
-            {String(index + 1).padStart(2, "0")}
-          </span>
-        </div>
+      {/* Index */}
+      <td className="px-5 py-4 w-14 text-xs font-bold text-[#94A3B8]">
+        {String(index + 1).padStart(2, "0")}
       </td>
 
       {/* Icon */}
       <td className="px-4 py-4 w-16">
         <div className="w-11 h-11 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center text-2xl select-none">
-          {cat.icon}
+          {getCategoryEmoji(cat.name)}
         </div>
       </td>
 
       {/* Name + slug */}
-      <td className="px-4 py-4">
+      <td className="px-4 py-4 min-w-[150px]">
         <p className="font-bold text-[#1E293B] text-sm">{cat.name}</p>
-        <p className="text-[11px] text-[#94A3B8] mt-[1px]">/{cat.slug}</p>
+        <p className="text-[11px] text-[#94A3B8] mt-[1px]">/{toSlug(cat.name)}</p>
       </td>
 
-      {/* Listings count */}
-      <td className="px-4 py-4">
-        <span className="bg-[#F1F5F9] text-[#475569] text-xs font-semibold px-3 py-1 rounded-full">
-          {cat.count} listings
-        </span>
+      {/* Description */}
+      <td className="px-4 py-4 text-xs text-[#64748B] max-w-[250px]">
+        <p className="truncate" title={cat.description}>{cat.description || "—"}</p>
       </td>
 
       {/* Active toggle */}
       <td className="px-4 py-4">
         <button
-          onClick={() => onToggle(cat.id)}
+          onClick={() => onToggle(cat._id, !cat.isActive)}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200
-            ${cat.active ? "bg-[#0F6E56]" : "bg-[#CBD5E1]"}`}
-          title={cat.active ? "Deactivate" : "Activate"}>
+            ${cat.isActive ? "bg-[#0F6E56]" : "bg-[#CBD5E1]"}`}
+          title={cat.isActive ? "Deactivate" : "Activate"}>
           <span
             className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200
-              ${cat.active ? "translate-x-6" : "translate-x-1"}`}
+              ${cat.isActive ? "translate-x-6" : "translate-x-1"}`}
           />
         </button>
-        <p className="text-[10px] text-[#94A3B8] mt-[3px] text-center">
-          {cat.active ? "Active" : "Hidden"}
+        <p className="text-[10px] text-[#94A3B8] mt-[3px]">
+          {cat.isActive ? "Active" : "Hidden"}
         </p>
-      </td>
-
-      {/* Reorder buttons */}
-      <td className="px-4 py-4">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => onMoveUp(index)}
-            disabled={index === 0}
-            title="Move up"
-            className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#64748B] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-sm font-bold">
-            ↑
-          </button>
-          <button
-            onClick={() => onMoveDown(index)}
-            disabled={index === total - 1}
-            title="Move down"
-            className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#64748B] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-sm font-bold">
-            ↓
-          </button>
-        </div>
       </td>
 
       {/* Actions */}
@@ -265,54 +215,74 @@ function CategoryRow({ cat, index, total, onMoveUp, onMoveDown, onEdit, onDelete
 /* ── Main Page ───────────────────────────────────────────── */
 export default function ManageCategoriesPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [categories,    setCategories]    = useState(INITIAL);
+  const [categories,    setCategories]    = useState([]);
+  const [isLoading,     setIsLoading]     = useState(true);
+  const [error,         setError]         = useState("");
   const [modal,         setModal]         = useState(null);
-    // modal types: "add" | { type:"edit", cat } | { type:"delete", cat }
-  const nextId = useRef(INITIAL.length + 1);
 
-  /* ── Helpers ── */
-  function moveUp(index) {
-    if (index === 0) return;
-    setCategories(prev => {
-      const arr = [...prev];
-      [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]];
-      return arr;
-    });
+  /* ── Actions ── */
+  const loadCategories = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const response = await fetchAdminCategories();
+      setCategories(response.data || response || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load categories.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  async function handleAdd({ name, description, isActive }) {
+    try {
+      await apiCreateCategory({ name, description, isActive });
+      loadCategories();
+      setModal(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to create category.");
+    }
   }
 
-  function moveDown(index) {
-    setCategories(prev => {
-      if (index === prev.length - 1) return prev;
-      const arr = [...prev];
-      [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]];
-      return arr;
-    });
+  async function handleEdit({ name, description, isActive }) {
+    try {
+      await apiUpdateCategory(modal.cat._id, { name, description, isActive });
+      loadCategories();
+      setModal(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update category.");
+    }
   }
 
-  function toggleActive(id) {
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, active: !c.active } : c));
+  async function handleDelete() {
+    try {
+      await apiDeleteCategory(modal.cat._id);
+      loadCategories();
+      setModal(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete category.");
+    }
   }
 
-  function handleAdd({ name, icon, slug }) {
-    const newCat = { id: nextId.current++, icon, name, slug, count: 0, active: true };
-    setCategories(prev => [...prev, newCat]);
-    setModal(null);
+  async function toggleActive(id, newStatus) {
+    try {
+      const cat = categories.find(c => c._id === id);
+      await apiUpdateCategory(id, {
+        name: cat.name,
+        description: cat.description,
+        isActive: newStatus,
+      });
+      loadCategories();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update category status.");
+    }
   }
 
-  function handleEdit({ name, icon, slug }) {
-    setCategories(prev => prev.map(c =>
-      c.id === modal.cat.id ? { ...c, name, icon, slug } : c
-    ));
-    setModal(null);
-  }
-
-  function handleDelete() {
-    setCategories(prev => prev.filter(c => c.id !== modal.cat.id));
-    setModal(null);
-  }
-
-  const activeCount   = categories.filter(c => c.active).length;
-  const totalListings = categories.reduce((sum, c) => sum + c.count, 0);
+  const activeCount = categories.filter(c => c.isActive).length;
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
@@ -333,7 +303,7 @@ export default function ManageCategoriesPage() {
               className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg bg-[#F1F5F9] text-[#475569]">☰</button>
             <div>
               <h1 className="text-lg font-extrabold text-[#0F172A]">Manage Categories</h1>
-              <p className="text-xs text-[#94A3B8]">{categories.length} categories · {activeCount} active</p>
+              <p className="text-xs text-[#94A3B8]">{isLoading ? "..." : categories.length} categories · {isLoading ? "..." : activeCount} active</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -343,21 +313,25 @@ export default function ManageCategoriesPage() {
               <span className="text-base">＋</span>
               <span className="hidden sm:inline">Add Category</span>
             </button>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#F59E0B] to-[#D97706] flex items-center justify-center text-xs font-extrabold text-[#0F172A] select-none">
-              AD
-            </div>
           </div>
         </header>
 
         <main className="flex-1 px-6 py-6 flex flex-col gap-6">
 
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
+
           {/* ── Stat cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { icon: "🏷️", label: "Total Categories", value: categories.length,  bg: "bg-blue-50",     text: "text-blue-700"     },
-              { icon: "✅", label: "Active",            value: activeCount,        bg: "bg-emerald-50",  text: "text-emerald-700"  },
-              { icon: "🚫", label: "Hidden",            value: categories.length - activeCount, bg: "bg-[#F1F5F9]", text: "text-[#475569]" },
-              { icon: "🏠", label: "Total Listings",    value: totalListings,      bg: "bg-amber-50",    text: "text-amber-700"    },
+              { icon: "🏷️", label: "Total Categories", value: isLoading ? "..." : categories.length,  bg: "bg-blue-50",     text: "text-blue-700"     },
+              { icon: "✅", label: "Active",            value: isLoading ? "..." : activeCount,        bg: "bg-emerald-50",  text: "text-emerald-700"  },
+              { icon: "🚫", label: "Hidden",            value: isLoading ? "..." : (categories.length - activeCount), bg: "bg-[#F1F5F9]", text: "text-[#475569]" },
+              { icon: "🏠", label: "Platform Types",    value: "PropFind",         bg: "bg-amber-50",    text: "text-amber-700"    },
             ].map(s => (
               <div key={s.label} className={`${s.bg} border border-[#E2E8F0] rounded-2xl p-4 flex items-center gap-3`}>
                 <span className="text-2xl">{s.icon}</span>
@@ -373,8 +347,7 @@ export default function ManageCategoriesPage() {
           <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-5 py-3">
             <span className="text-lg shrink-0">💡</span>
             <p className="text-xs text-blue-700 font-medium">
-              Use <strong>↑ ↓</strong> buttons to reorder categories. Order here controls the display order on the homepage and property filters.
-              Toggle the switch to show/hide a category from public pages.
+              Toggle the visibility switch to instantly show or hide a category from the public pages and user filters.
             </p>
           </div>
 
@@ -384,7 +357,7 @@ export default function ManageCategoriesPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#F1F5F9]">
               <div>
                 <h2 className="text-sm font-bold text-[#0F172A]">Property Categories</h2>
-                <p className="text-xs text-[#94A3B8] mt-[2px]">Drag or use arrow buttons to reorder</p>
+                <p className="text-xs text-[#94A3B8] mt-[2px]">Review and configure property listing categories</p>
               </div>
               <button
                 onClick={() => setModal("add")}
@@ -397,7 +370,7 @@ export default function ManageCategoriesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
-                    {["#","Icon","Name / Slug","Listings","Visibility","Reorder","Actions"].map(h => (
+                    {["#","Icon","Name / Slug","Description","Visibility","Actions"].map(h => (
                       <th key={h}
                         className="text-left text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider px-4 py-3 whitespace-nowrap first:px-5 last:pr-5">
                         {h}
@@ -406,19 +379,32 @@ export default function ManageCategoriesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1F5F9]">
-                  {categories.map((cat, i) => (
-                    <CategoryRow
-                      key={cat.id}
-                      cat={cat}
-                      index={i}
-                      total={categories.length}
-                      onMoveUp={moveUp}
-                      onMoveDown={moveDown}
-                      onEdit={c => setModal({ type: "edit", cat: c })}
-                      onDelete={c => setModal({ type: "delete", cat: c })}
-                      onToggle={toggleActive}
-                    />
-                  ))}
+                  {isLoading ? (
+                    Array.from({ length: 4 }).map((_, idx) => (
+                      <tr key={idx} className="animate-pulse">
+                        <td className="px-5 py-4"><div className="w-4 h-4 bg-slate-200 rounded" /></td>
+                        <td className="px-4 py-4"><div className="w-11 h-11 rounded-xl bg-slate-200" /></td>
+                        <td className="px-4 py-4">
+                          <div className="h-4 bg-slate-200 rounded w-24 mb-2" />
+                          <div className="h-3 bg-slate-200 rounded w-16" />
+                        </td>
+                        <td className="px-4 py-4"><div className="h-4 bg-slate-200 rounded w-48" /></td>
+                        <td className="px-4 py-4"><div className="h-6 bg-slate-200 rounded-full w-11" /></td>
+                        <td className="px-4 py-4"><div className="h-8 bg-slate-200 rounded-lg w-20" /></td>
+                      </tr>
+                    ))
+                  ) : (
+                    categories.map((cat, i) => (
+                      <CategoryRow
+                        key={cat._id}
+                        cat={cat}
+                        index={i}
+                        onEdit={c => setModal({ type: "edit", cat: c })}
+                        onDelete={c => setModal({ type: "delete", cat: c })}
+                        onToggle={toggleActive}
+                      />
+                    ))
+                  )}
                 </tbody>
               </table>
 
@@ -438,7 +424,7 @@ export default function ManageCategoriesPage() {
           </div>
 
           {/* ── Live preview ── */}
-          {categories.some(c => c.active) && (
+          {!isLoading && categories.some(c => c.isActive) && (
             <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -450,12 +436,12 @@ export default function ManageCategoriesPage() {
                 </span>
               </div>
               <div className="flex flex-wrap gap-3">
-                {categories.filter(c => c.active).map(cat => (
-                  <div key={cat.id}
+                {categories.filter(c => c.isActive).map(cat => (
+                  <div key={cat._id}
                     className="border border-[#E2E8F0] rounded-xl p-5 px-4 text-center bg-[#F8FAFC] w-[100px] hover:border-[#F59E0B] hover:-translate-y-[2px] hover:shadow-[0_8px_24px_rgba(245,158,11,0.12)] transition-all duration-200 cursor-default">
-                    <div className="text-[28px] mb-2">{cat.icon}</div>
+                    <div className="text-[28px] mb-2">{getCategoryEmoji(cat.name)}</div>
                     <div className="text-xs font-semibold text-[#1E293B] truncate">{cat.name}</div>
-                    <div className="text-[10px] text-[#94A3B8] mt-[2px]">{cat.count} listings</div>
+                    <div className="text-[10px] text-[#94A3B8] mt-[2px]">Category</div>
                   </div>
                 ))}
               </div>
@@ -479,7 +465,7 @@ export default function ManageCategoriesPage() {
       {modal?.type === "delete" && (
         <ConfirmModal
           title={`Delete "${modal.cat.name}"?`}
-          message={`This will remove the category from the platform. ${modal.cat.count > 0 ? `${modal.cat.count} listings will become uncategorized.` : ""}`}
+          message="This will remove the category from the platform. Listings using this category may become uncategorized."
           confirmLabel="Yes, Delete"
           confirmStyle="bg-red-500 hover:bg-red-600"
           onConfirm={handleDelete}

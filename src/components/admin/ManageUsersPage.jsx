@@ -1,20 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import Pagination from "@/components/listing/Pagination";
+import {
+  fetchAdminUsers,
+  fetchAdminUserById,
+  toggleBlockUser,
+  promoteToAgent as apiPromoteToAgent,
+  deleteAdminUser,
+} from "@/lib/adminApi";
 
-/* ── Sample users ─────────────────────────────────────────── */
-const INITIAL_USERS = [
-  { id:1, initials:"AK", grad:"from-[#185FA5] to-[#0C447C]",   name:"Ahmed Khan",   email:"ahmed.khan@gmail.com",   phone:"+92 300 1112233", role:"agent",  status:"active",  joined:"Jan 12, 2024" },
-  { id:2, initials:"SM", grad:"from-[#BE185D] to-[#9D174D]",   name:"Sara Malik",   email:"sara.malik@outlook.com", phone:"+92 321 9876543", role:"buyer",  status:"active",  joined:"Feb 3, 2024"  },
-  { id:3, initials:"BR", grad:"from-[#0F6E56] to-[#064E3B]",   name:"Bilal Raza",   email:"bilal.raza@yahoo.com",   phone:"+92 333 4455667", role:"buyer",  status:"blocked", joined:"Mar 18, 2024" },
-  { id:4, initials:"FN", grad:"from-[#6D28D9] to-[#4C1D95]",   name:"Fatima Noor",  email:"fatima.noor@gmail.com",  phone:"+92 345 6677889", role:"agent",  status:"active",  joined:"Apr 5, 2024"  },
-  { id:5, initials:"ZA", grad:"from-[#0369A1] to-[#075985]",   name:"Zara Ahmed",   email:"zara.ahmed@gmail.com",   phone:"+92 312 8899001", role:"buyer",  status:"active",  joined:"Apr 22, 2024" },
-  { id:6, initials:"UT", grad:"from-[#854F0B] to-[#92400E]",   name:"Usman Tariq",  email:"usman.tariq@gmail.com",  phone:"+92 300 1234567", role:"buyer",  status:"blocked", joined:"May 9, 2024"  },
-  { id:7, initials:"HA", grad:"from-[#065F46] to-[#047857]",   name:"Hassan Ali",   email:"hassan.ali@propfind.pk", phone:"+92 333 0001111", role:"admin",  status:"active",  joined:"Jan 1, 2024"  },
-  { id:8, initials:"NA", grad:"from-[#4F46E5] to-[#7C3AED]",   name:"Nadia Aziz",   email:"nadia.aziz@hotmail.com", phone:"+92 311 2223344", role:"agent",  status:"active",  joined:"Jun 14, 2024" },
-];
+const INITIAL_USERS = [];
 
 const ITEMS_PER_PAGE = 6;
 
@@ -24,12 +21,13 @@ const ROLE_CFG = {
   agent: "bg-emerald-50 text-emerald-700 border-emerald-200",
   admin: "bg-red-50    text-red-700    border-red-200",
 };
+
 const STATUS_CFG = {
   active:  "bg-emerald-50 text-emerald-700 border-emerald-200",
   blocked: "bg-[#F1F5F9]  text-[#64748B]   border-[#E2E8F0]",
 };
 
-/* ── Confirm modal ────────────────────────────────────────── */
+/* ── Confirm modal ─────────────────────────────────────────── */
 function ConfirmModal({ title, message, confirmLabel, confirmStyle, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -54,9 +52,187 @@ function ConfirmModal({ title, message, confirmLabel, confirmStyle, onConfirm, o
   );
 }
 
+/* ── User Detail Modal ─────────────────────────────────────── */
+function UserDetailModal({ userId, onClose }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const data = await fetchAdminUserById(userId);
+        setUser(data);
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load user details.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadUser();
+  }, [userId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl w-full max-w-md mx-4 shadow-2xl overflow-hidden border border-[#E2E8F0]">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-[#0F172A] to-[#1E293B] px-6 py-4 flex items-center justify-between text-white">
+          <span className="font-extrabold text-sm tracking-wider uppercase">User Details</span>
+          <button onClick={onClose} className="text-[#94A3B8] hover:text-white transition-colors text-lg">✕</button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 max-h-[75vh] overflow-y-auto">
+          {loading ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <div className="w-10 h-10 border-4 border-[#F59E0B] border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-[#64748B] font-semibold">Loading details...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-6 text-red-500 font-medium text-sm">
+              ⚠️ {error}
+            </div>
+          ) : user ? (
+            <div className="flex flex-col gap-5">
+              
+              {/* Profile Card */}
+              <div className="flex items-center gap-4 bg-slate-50 border border-slate-100 rounded-xl p-4">
+                {user.profileImage?.url ? (
+                  <img src={user.profileImage.url} alt={user.name} className="w-16 h-16 rounded-full object-cover border-2 border-white shadow" />
+                ) : (
+                  <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${getUserGrad(user._id)} flex items-center justify-center text-xl font-extrabold text-white`}>
+                    {getInitials(user.name)}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-extrabold text-base text-[#0F172A] flex items-center gap-2 truncate">
+                    {user.name}
+                    {user.verified && <span className="text-[10px] bg-emerald-500 text-white font-bold px-1.5 py-[2px] rounded shrink-0">VERIFIED</span>}
+                  </h4>
+                  <p className="text-xs text-[#64748B] mt-[2px] truncate">{user.email}</p>
+                  <span className="inline-block mt-2 text-[10px] font-bold px-2 py-[2px] rounded-full border uppercase bg-blue-50 text-blue-700 border-blue-200">
+                    {user.role}
+                  </span>
+                </div>
+              </div>
+
+              {/* Bio */}
+              {user.bio && (
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bio</span>
+                  <p className="text-sm text-[#475569] mt-1 leading-relaxed">{user.bio}</p>
+                </div>
+              )}
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase">City</p>
+                  <p className="text-sm font-bold text-[#1E293B] mt-1 capitalize">{user.city || "—"}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase">Experience</p>
+                  <p className="text-sm font-bold text-[#1E293B] mt-1">{user.experience ? `${user.experience} Years` : "—"}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase">Deals Completed</p>
+                  <p className="text-sm font-bold text-[#1E293B] mt-1">{user.deals ?? 0}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase">Rating</p>
+                  <p className="text-sm font-bold text-amber-500 mt-1 flex items-center justify-center gap-1">
+                    ⭐ {user.rating?.average ?? 0} <span className="text-xs text-slate-400">({user.rating?.count ?? 0})</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Contact Info */}
+              <div className="border-t border-[#F1F5F9] pt-4 flex flex-col gap-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-semibold">Phone:</span>
+                  <span className="text-[#1E293B] font-bold">{user.phoneNumber || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-semibold">WhatsApp:</span>
+                  <span className="text-[#1E293B] font-bold">{user.whatsapp || "—"}</span>
+                </div>
+                {user.agencyName && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-semibold">Agency:</span>
+                    <span className="text-[#1E293B] font-bold">{user.agencyName}</span>
+                  </div>
+                )}
+                {user.specializations?.length > 0 && (
+                  <div className="flex justify-between items-start">
+                    <span className="text-slate-400 font-semibold">Specializations:</span>
+                    <span className="text-[#1E293B] font-bold text-right max-w-[180px]">
+                      {user.specializations.join(", ")}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-semibold">Member Since:</span>
+                  <span className="text-[#1E293B] font-bold">{formatDate(user.createdAt)}</span>
+                </div>
+              </div>
+
+            </div>
+          ) : null}
+        </div>
+
+        {/* Footer */}
+        <div className="bg-slate-50 border-t border-[#E2E8F0] px-6 py-4 flex justify-end">
+          <button onClick={onClose}
+            className="px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors">
+            Close
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function getInitials(name = "") {
+  if (!name) return "U";
+  const parts = name.split(" ");
+  return parts.map(p => p[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function getUserGrad(id = "") {
+  const grads = [
+    "from-[#185FA5] to-[#0C447C]",
+    "from-[#BE185D] to-[#9D174D]",
+    "from-[#0F6E56] to-[#064E3B]",
+    "from-[#6D28D9] to-[#4C1D95]",
+    "from-[#0369A1] to-[#075985]",
+    "from-[#854F0B] to-[#92400E]",
+    "from-[#065F46] to-[#047857]",
+    "from-[#4F46E5] to-[#7C3AED]",
+  ];
+  if (!id) return grads[0];
+  const index = id.charCodeAt(id.length - 1) % grads.length;
+  return grads[isNaN(index) ? 0 : index];
+}
+
+function formatDate(isoString) {
+  if (!isoString) return "—";
+  return new Date(isoString).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+
 export default function ManageUsersPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [users,         setUsers]         = useState(INITIAL_USERS);
+  const [users,         setUsers]         = useState([]);
+  const [totalUsers,    setTotalUsers]    = useState(0);
+  const [totalPages,    setTotalPages]    = useState(1);
+  const [isLoading,     setIsLoading]     = useState(true);
+  const [error,         setError]         = useState("");
   const [search,        setSearch]        = useState("");
   const [roleFilter,    setRoleFilter]    = useState("all");
   const [statusFilter,  setStatusFilter]  = useState("all");
@@ -64,19 +240,39 @@ export default function ManageUsersPage() {
   const [currentPage,   setCurrentPage]   = useState(1);
   const [modal,         setModal]         = useState(null); // { type, payload }
 
-  /* ── Filtered list ── */
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return users.filter(u => {
-      const matchSearch = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-      const matchRole   = roleFilter   === "all" || u.role   === roleFilter;
-      const matchStatus = statusFilter === "all" || u.status === statusFilter;
-      return matchSearch && matchRole && matchStatus;
-    });
-  }, [users, search, roleFilter, statusFilter]);
+  /* ── Actions ── */
+  const loadUsers = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const params = {
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        search: search || undefined,
+      };
+      if (roleFilter !== "all") {
+        params.role = roleFilter;
+      }
+      if (statusFilter === "blocked") {
+        params.isBlocked = true;
+      } else if (statusFilter === "active") {
+        params.isBlocked = false;
+      }
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-  const paginated  = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+      const response = await fetchAdminUsers(params);
+      setUsers(response.data || []);
+      setTotalUsers(response.total ?? 0);
+      setTotalPages(response.pages ?? 1);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load users.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, search, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   /* Reset page on filter change */
   function applySearch(v)  { setSearch(v);      setCurrentPage(1); setSelected([]); }
@@ -84,7 +280,7 @@ export default function ManageUsersPage() {
   function applyStatus(v)  { setStatusFilter(v); setCurrentPage(1); setSelected([]); }
 
   /* ── Row select ── */
-  const pageIds       = paginated.map(u => u.id);
+  const pageIds       = users.map(u => u._id);
   const allPageSelected = pageIds.length > 0 && pageIds.every(id => selected.includes(id));
 
   function toggleSelectAll() {
@@ -95,25 +291,56 @@ export default function ManageUsersPage() {
   }
 
   /* ── User actions ── */
-  function toggleBlock(id) {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: u.status === "active" ? "blocked" : "active" } : u));
+  async function handleToggleBlock(id) {
+    try {
+      await toggleBlockUser(id);
+      loadUsers();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update user status.");
+    }
   }
-  function deleteUser(id) {
-    setUsers(prev => prev.filter(u => u.id !== id));
-    setSelected(prev => prev.filter(i => i !== id));
-    setModal(null);
+
+  async function handleDelete(id) {
+    try {
+      await deleteAdminUser(id);
+      loadUsers();
+      setSelected(prev => prev.filter(i => i !== id));
+      setModal(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete user.");
+    }
   }
-  function promoteToAgent(id) {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, role: "agent" } : u));
-    setModal(null);
+
+  async function handlePromote(id) {
+    try {
+      await apiPromoteToAgent(id);
+      loadUsers();
+      setModal(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to promote user.");
+    }
   }
-  function bulkBlock() {
-    setUsers(prev => prev.map(u => selected.includes(u.id) ? { ...u, status: "blocked" } : u));
-    setSelected([]); setModal(null);
+
+  async function handleBulkBlock() {
+    try {
+      await Promise.all(selected.map(id => toggleBlockUser(id)));
+      loadUsers();
+      setSelected([]);
+      setModal(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to block selected users.");
+    }
   }
-  function bulkDelete() {
-    setUsers(prev => prev.filter(u => !selected.includes(u.id)));
-    setSelected([]); setModal(null);
+
+  async function handleBulkDelete() {
+    try {
+      await Promise.all(selected.map(id => deleteAdminUser(id)));
+      loadUsers();
+      setSelected([]);
+      setModal(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete selected users.");
+    }
   }
 
   const selectDropCls = "border border-[#E2E8F0] rounded-xl px-3 py-[9px] text-sm text-[#1E293B] outline-none focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20 transition-all bg-white cursor-pointer appearance-none";
@@ -137,7 +364,7 @@ export default function ManageUsersPage() {
               className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg bg-[#F1F5F9] text-[#475569]">☰</button>
             <div>
               <h1 className="text-lg font-extrabold text-[#0F172A]">Manage Users</h1>
-              <p className="text-xs text-[#94A3B8]">Total: {users.length} users</p>
+              <p className="text-xs text-[#94A3B8]">Total: {isLoading ? "..." : totalUsers} users</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -151,6 +378,12 @@ export default function ManageUsersPage() {
         </header>
 
         <main className="flex-1 px-6 py-6 flex flex-col gap-5">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
 
           {/* ── Search + Filters bar ── */}
           <div className="flex flex-wrap items-center gap-3">
@@ -189,7 +422,7 @@ export default function ManageUsersPage() {
 
             {/* Result count */}
             <span className="text-sm text-[#94A3B8] ml-auto shrink-0 hidden sm:block">
-              {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+              {isLoading ? "..." : totalUsers} result{totalUsers !== 1 ? "s" : ""}
             </span>
           </div>
 
@@ -234,97 +467,124 @@ export default function ManageUsersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1F5F9]">
-                  {paginated.map(u => {
-                    const isSelected = selected.includes(u.id);
-                    return (
-                      <tr key={u.id}
-                        className={`transition-colors hover:bg-[#F8FAFC] ${isSelected ? "bg-[#FFFBEB]" : ""}`}>
-
-                        {/* Checkbox */}
-                        <td className="px-5 py-3">
-                          <input type="checkbox" checked={isSelected} onChange={() => toggleRow(u.id)}
-                            className="w-4 h-4 rounded accent-[#F59E0B] cursor-pointer" />
-                        </td>
-
-                        {/* Avatar + Name */}
-                        <td className="px-4 py-3">
+                  {isLoading ? (
+                    Array.from({ length: ITEMS_PER_PAGE }).map((_, idx) => (
+                      <tr key={idx} className="animate-pulse">
+                        <td className="px-5 py-4"><div className="w-4 h-4 bg-slate-200 rounded" /></td>
+                        <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${u.grad}
-                              flex items-center justify-center text-xs font-extrabold text-white shrink-0 select-none`}>
-                              {u.initials}
-                            </div>
-                            <span className="font-semibold text-[#1E293B] whitespace-nowrap">{u.name}</span>
+                            <div className="w-9 h-9 rounded-full bg-slate-200 shrink-0" />
+                            <div className="h-4 bg-slate-200 rounded w-24" />
                           </div>
                         </td>
-
-                        {/* Email */}
-                        <td className="px-4 py-3 text-[#64748B] text-xs">{u.email}</td>
-
-                        {/* Phone */}
-                        <td className="px-4 py-3 text-[#64748B] text-xs whitespace-nowrap">{u.phone}</td>
-
-                        {/* Role */}
-                        <td className="px-4 py-3">
-                          <span className={`text-[11px] font-bold px-[10px] py-1 rounded-full border capitalize ${ROLE_CFG[u.role]}`}>
-                            {u.role}
-                          </span>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-3">
-                          <span className={`text-[11px] font-bold px-[10px] py-1 rounded-full border capitalize ${STATUS_CFG[u.status]}`}>
-                            {u.status}
-                          </span>
-                        </td>
-
-                        {/* Joined */}
-                        <td className="px-4 py-3 text-[#94A3B8] text-xs whitespace-nowrap">{u.joined}</td>
-
-                        {/* Actions */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            {/* View */}
-                            <button title="View Profile"
-                              className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-blue-50 hover:text-blue-600 text-[#64748B] flex items-center justify-center transition-colors text-sm">
-                              👁️
-                            </button>
-
-                            {/* Block / Unblock */}
-                            <button title={u.status === "active" ? "Block User" : "Unblock User"}
-                              onClick={() => toggleBlock(u.id)}
-                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-sm
-                                ${u.status === "active"
-                                  ? "bg-[#F1F5F9] hover:bg-amber-50 hover:text-amber-600 text-[#64748B]"
-                                  : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}>
-                              {u.status === "active" ? "🚫" : "✅"}
-                            </button>
-
-                            {/* Promote to Agent */}
-                            {u.role === "buyer" && (
-                              <button title="Promote to Agent"
-                                onClick={() => setModal({ type: "promote", payload: u.id })}
-                                className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-purple-50 hover:text-purple-600 text-[#64748B] flex items-center justify-center transition-colors text-sm">
-                                ⬆️
-                              </button>
-                            )}
-
-                            {/* Delete */}
-                            {u.role !== "admin" && (
-                              <button title="Delete User"
-                                onClick={() => setModal({ type: "delete", payload: u.id })}
-                                className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-red-50 hover:text-red-600 text-[#64748B] flex items-center justify-center transition-colors text-sm">
-                                🗑️
-                              </button>
-                            )}
-                          </div>
-                        </td>
+                        <td className="px-4 py-4"><div className="h-4 bg-slate-200 rounded w-32" /></td>
+                        <td className="px-4 py-4"><div className="h-4 bg-slate-200 rounded w-24" /></td>
+                        <td className="px-4 py-4"><div className="h-5 bg-slate-200 rounded-full w-12" /></td>
+                        <td className="px-4 py-4"><div className="h-5 bg-slate-200 rounded-full w-12" /></td>
+                        <td className="px-4 py-4"><div className="h-4 bg-slate-200 rounded w-16" /></td>
+                        <td className="px-4 py-4"><div className="h-8 bg-slate-200 rounded-lg w-24" /></td>
                       </tr>
-                    );
-                  })}
+                    ))
+                  ) : (
+                    users.map(u => {
+                      const isSelected = selected.includes(u._id);
+                      const status = u.isBlocked ? "blocked" : "active";
+                      const phone = u.phoneNumber || "—";
+                      return (
+                        <tr key={u._id}
+                          className={`transition-colors hover:bg-[#F8FAFC] ${isSelected ? "bg-[#FFFBEB]" : ""}`}>
+
+                          {/* Checkbox */}
+                          <td className="px-5 py-3">
+                            <input type="checkbox" checked={isSelected} onChange={() => toggleRow(u._id)}
+                              className="w-4 h-4 rounded accent-[#F59E0B] cursor-pointer" />
+                          </td>
+
+                          {/* Avatar + Name */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              {u.profileImage?.url ? (
+                                <img src={u.profileImage.url} alt={u.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                              ) : (
+                                <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getUserGrad(u._id)}
+                                  flex items-center justify-center text-xs font-extrabold text-white shrink-0 select-none`}>
+                                  {getInitials(u.name)}
+                                </div>
+                              )}
+                              <span className="font-semibold text-[#1E293B] whitespace-nowrap">{u.name}</span>
+                            </div>
+                          </td>
+
+                          {/* Email */}
+                          <td className="px-4 py-3 text-[#64748B] text-xs">{u.email}</td>
+
+                          {/* Phone */}
+                          <td className="px-4 py-3 text-[#64748B] text-xs whitespace-nowrap">{phone}</td>
+
+                          {/* Role */}
+                          <td className="px-4 py-3">
+                            <span className={`text-[11px] font-bold px-[10px] py-1 rounded-full border capitalize ${ROLE_CFG[u.role] || "bg-slate-50 text-slate-700 border-slate-200"}`}>
+                              {u.role}
+                            </span>
+                          </td>
+
+                          {/* Status */}
+                          <td className="px-4 py-3">
+                            <span className={`text-[11px] font-bold px-[10px] py-1 rounded-full border capitalize ${STATUS_CFG[status]}`}>
+                              {status}
+                            </span>
+                          </td>
+
+                          {/* Joined */}
+                          <td className="px-4 py-3 text-[#94A3B8] text-xs whitespace-nowrap">{formatDate(u.createdAt)}</td>
+
+                          {/* Actions */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              {/* View */}
+                              <button title="View Profile"
+                                onClick={() => setModal({ type: "view", payload: u._id })}
+                                className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-blue-50 hover:text-blue-600 text-[#64748B] flex items-center justify-center transition-colors text-sm">
+                                👁️
+                              </button>
+
+                              {/* Block / Unblock */}
+                              <button title={status === "active" ? "Block User" : "Unblock User"}
+                                onClick={() => handleToggleBlock(u._id)}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-sm
+                                  ${status === "active"
+                                    ? "bg-[#F1F5F9] hover:bg-amber-50 hover:text-amber-600 text-[#64748B]"
+                                    : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}>
+                                {status === "active" ? "🚫" : "✅"}
+                              </button>
+
+                              {/* Promote to Agent */}
+                              {u.role === "buyer" && (
+                                <button title="Promote to Agent"
+                                  onClick={() => setModal({ type: "promote", payload: u._id })}
+                                  className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-purple-50 hover:text-purple-600 text-[#64748B] flex items-center justify-center transition-colors text-sm">
+                                  ⬆️
+                                </button>
+                              )}
+
+                              {/* Delete */}
+                              {u.role !== "admin" && (
+                                <button title="Delete User"
+                                  onClick={() => setModal({ type: "delete", payload: u._id })}
+                                  className="w-8 h-8 rounded-lg bg-[#F1F5F9] hover:bg-red-50 hover:text-red-600 text-[#64748B] flex items-center justify-center transition-colors text-sm">
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
 
-              {paginated.length === 0 && (
+              {!isLoading && users.length === 0 && (
                 <div className="flex flex-col items-center py-16 text-center">
                   <span className="text-5xl mb-3">👥</span>
                   <p className="font-bold text-[#0F172A]">No users found</p>
@@ -344,32 +604,37 @@ export default function ManageUsersPage() {
       </div>
 
       {/* ── Modals ── */}
+      {modal?.type === "view" && (
+        <UserDetailModal
+          userId={modal.payload}
+          onClose={() => setModal(null)} />
+      )}
       {modal?.type === "delete" && (
         <ConfirmModal
           title="Delete User?" message="This action is permanent and cannot be undone."
           confirmLabel="Yes, Delete" confirmStyle="bg-red-500 hover:bg-red-600"
-          onConfirm={() => deleteUser(modal.payload)}
+          onConfirm={() => handleDelete(modal.payload)}
           onCancel={() => setModal(null)} />
       )}
       {modal?.type === "promote" && (
         <ConfirmModal
           title="Promote to Agent?" message="This user will be granted Agent privileges."
           confirmLabel="Yes, Promote" confirmStyle="bg-[#0F6E56] hover:bg-[#065F46]"
-          onConfirm={() => promoteToAgent(modal.payload)}
+          onConfirm={() => handlePromote(modal.payload)}
           onCancel={() => setModal(null)} />
       )}
       {modal?.type === "bulkBlock" && (
         <ConfirmModal
           title={`Block ${selected.length} Users?`} message="Selected users will lose access to their accounts."
           confirmLabel="Block All" confirmStyle="bg-amber-500 hover:bg-amber-600"
-          onConfirm={bulkBlock}
+          onConfirm={handleBulkBlock}
           onCancel={() => setModal(null)} />
       )}
       {modal?.type === "bulkDelete" && (
         <ConfirmModal
           title={`Delete ${selected.length} Users?`} message="This is permanent. All their data will be removed."
           confirmLabel="Delete All" confirmStyle="bg-red-500 hover:bg-red-600"
-          onConfirm={bulkDelete}
+          onConfirm={handleBulkDelete}
           onCancel={() => setModal(null)} />
       )}
 
