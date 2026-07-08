@@ -13,7 +13,7 @@ const QUICK_ACTIONS = [
   { icon: "⚙️", label: "Settings",       href: "/dashboard/profile",   color: "bg-white text-[#0F172A] border border-[#E2E8F0]" },
 ];
 
-export default function AgentDashboard({ listings = [], isLoading = false, error = "" }) {
+export default function AgentDashboard({ listings = [], stats = null, isLoading = false, error = "" }) {
   const { user } = useAuth();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -30,7 +30,7 @@ export default function AgentDashboard({ listings = [], isLoading = false, error
         </p>
       </div>
 
-      <DashboardStats />
+      <DashboardStats stats={stats} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {QUICK_ACTIONS.map(a => (

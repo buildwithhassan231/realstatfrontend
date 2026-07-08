@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import { 
+  getSettings, 
+  updateGeneralSettings, 
+  updatePlatformSettings, 
+  updateListingSettings, 
+  updateAdminProfile, 
+  changeAdminPassword 
+} from "@/services/adminSettings.service";
 
 /* ── Shared styles ───────────────────────────────────────── */
 const INPUT = "w-full border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm text-[#1E293B] outline-none transition-all placeholder:text-[#CBD5E1] bg-white focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20";
@@ -62,12 +70,12 @@ function Section({ icon, title, subtitle, children }) {
 }
 
 /* ── Save footer row ─────────────────────────────────────── */
-function SaveRow({ onSave, label = "Save Changes" }) {
+function SaveRow({ onSave, label = "Save Changes", loading }) {
   return (
     <div className="flex justify-end pt-4 border-t border-[#F1F5F9] mt-2">
-      <button onClick={onSave}
-        className="flex items-center gap-2 bg-[#F59E0B] hover:bg-[#D97706] text-[#0F172A] text-sm font-bold px-6 py-[10px] rounded-xl transition-colors">
-        💾 {label}
+      <button onClick={onSave} disabled={loading}
+        className="flex items-center gap-2 bg-[#F59E0B] hover:bg-[#D97706] disabled:opacity-70 text-[#0F172A] text-sm font-bold px-6 py-[10px] rounded-xl transition-colors">
+        {loading ? "⏳ Saving..." : `💾 ${label}`}
       </button>
     </div>
   );
@@ -133,6 +141,8 @@ export default function AdminSettingsPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeTab,     setActiveTab]     = useState("general");
   const [toast,         setToast]         = useState(null);
+  const [isLoading,     setIsLoading]     = useState(true);
+  const [isSaving,      setIsSaving]      = useState(false);
 
   /* ── General ── */
   const [siteName,      setSiteName]      = useState("PropFind");
@@ -225,16 +235,118 @@ export default function AdminSettingsPage() {
     return e;
   }
 
+  /* ── Initial Load ── */
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const response = await getSettings();
+        // Extract the actual settings object (handling cases where backend wraps it in { success: true, data: {...} })
+        const data = response?.data || response || {};
+        
+        // fill states
+        setSiteName(data.siteName || "");
+        setSiteUrl(data.siteUrl || "");
+        setSiteTagline(data.siteTagline || "");
+        setContactEmail(data.contactEmail || "");
+        setSupportPhone(data.supportPhone || "");
+
+        setMaintenance(!!data.maintenance);
+        setRegistrations(data.registrations !== false); // default true
+        setEmailNotifications(data.emailNotifications !== false); // default true
+        setAutoApprove(!!data.autoApprove);
+
+        setFeaturedLimit(data.featuredLimit || 10);
+        setListingsPerPage(data.listingsPerPage || 12);
+        setMaxImages(data.maxImages || 10);
+
+        setAdminName(data.adminName || "");
+        setAdminEmail(data.adminEmail || "");
+        setAdminPhone(data.adminPhone || "");
+        setAdminBio(data.adminBio || "");
+      } catch (error) {
+        showToast(error.message, "error");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
   /* ── Save handlers ── */
-  function saveGeneral()  { const e = validateGeneral();  setGeneralErrs(e); if (!Object.keys(e).length) showToast("General settings saved."); }
-  function saveLimits()   { const e = validateLimits();   setLimitErrs(e);   if (!Object.keys(e).length) showToast("Listing settings saved."); }
-  function saveProfile()  { const e = validateProfile();  setProfileErrs(e); if (!Object.keys(e).length) showToast("Admin profile updated."); }
-  function savePassword() {
+  async function saveGeneral()  { 
+    const e = validateGeneral();  
+    setGeneralErrs(e); 
+    if (!Object.keys(e).length) {
+      try {
+        setIsSaving(true);
+        await updateGeneralSettings({ siteName, siteUrl, siteTagline, contactEmail, supportPhone });
+        showToast("General settings saved.");
+      } catch (error) {
+        showToast(error.message, "error");
+      } finally {
+        setIsSaving(false);
+      }
+    } 
+  }
+
+  async function savePlatform() {
+    try {
+      setIsSaving(true);
+      await updatePlatformSettings({ maintenance, registrations, emailNotifications, autoApprove });
+      showToast("Platform settings saved.");
+    } catch (error) {
+      showToast(error.message, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveLimits()   { 
+    const e = validateLimits();   
+    setLimitErrs(e);   
+    if (!Object.keys(e).length) {
+      try {
+        setIsSaving(true);
+        await updateListingSettings({ featuredLimit, listingsPerPage, maxImages });
+        showToast("Listing settings saved.");
+      } catch (error) {
+        showToast(error.message, "error");
+      } finally {
+        setIsSaving(false);
+      }
+    } 
+  }
+
+  async function saveProfile()  { 
+    const e = validateProfile();  
+    setProfileErrs(e); 
+    if (!Object.keys(e).length) {
+      try {
+        setIsSaving(true);
+        await updateAdminProfile({ adminName, adminEmail, adminPhone, adminBio });
+        showToast("Admin profile updated.");
+      } catch (error) {
+        showToast(error.message, "error");
+      } finally {
+        setIsSaving(false);
+      }
+    } 
+  }
+
+  async function savePassword() {
     const e = validatePassword();
     setPwdErrs(e);
     if (!Object.keys(e).length) {
-      setCurPwd(""); setNewPwd(""); setConPwd(""); setPwdStrength(0);
-      showToast("Password changed successfully.");
+      try {
+        setIsSaving(true);
+        await changeAdminPassword({ curPwd, newPwd, conPwd });
+        setCurPwd(""); setNewPwd(""); setConPwd(""); setPwdStrength(0);
+        showToast("Password changed successfully.");
+      } catch (error) {
+        showToast(error.message, "error");
+      } finally {
+        setIsSaving(false);
+      }
     }
   }
 
@@ -281,6 +393,12 @@ export default function AdminSettingsPage() {
         </header>
 
         <main className="flex-1 px-6 py-6 flex flex-col gap-6 max-w-3xl w-full">
+          {isLoading ? (
+            <div className="flex justify-center items-center py-20">
+              <span className="w-8 h-8 rounded-full border-4 border-[#E2E8F0] border-t-[#F59E0B] animate-spin"></span>
+            </div>
+          ) : (
+            <>
           {/* ── Tabs ── */}
           <div className="flex flex-wrap gap-2">
             {TABS.map(t => (
@@ -326,7 +444,7 @@ export default function AdminSettingsPage() {
                       placeholder="+92 300 0001111" className={INPUT} />
                   </Field>
                 </div>
-                <SaveRow onSave={saveGeneral} />
+                <SaveRow onSave={saveGeneral} loading={isSaving} />
               </div>
             </Section>
           )}
@@ -379,9 +497,9 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div className="flex justify-end pt-4 border-t border-[#F1F5F9] mt-2">
-                  <button onClick={() => showToast("Platform settings saved.")}
-                    className="flex items-center gap-2 bg-[#F59E0B] hover:bg-[#D97706] text-[#0F172A] text-sm font-bold px-6 py-[10px] rounded-xl transition-colors">
-                    💾 Save Settings
+                  <button onClick={savePlatform} disabled={isSaving}
+                    className="flex items-center gap-2 bg-[#F59E0B] hover:bg-[#D97706] disabled:opacity-70 text-[#0F172A] text-sm font-bold px-6 py-[10px] rounded-xl transition-colors">
+                    {isSaving ? "⏳ Saving..." : "💾 Save Settings"}
                   </button>
                 </div>
               </div>
@@ -450,7 +568,7 @@ export default function AdminSettingsPage() {
                   </Field>
                 </div>
 
-                <SaveRow onSave={saveLimits} />
+                <SaveRow onSave={saveLimits} loading={isSaving} />
               </div>
             </Section>
           )}
@@ -498,7 +616,7 @@ export default function AdminSettingsPage() {
                     rows={3} placeholder="A short description about the admin..."
                     className={`${INPUT} resize-none`} />
                 </Field>
-                <SaveRow onSave={saveProfile} label="Update Profile" />
+                <SaveRow onSave={saveProfile} label="Update Profile" loading={isSaving} />
               </div>
             </Section>
           )}
@@ -562,11 +680,13 @@ export default function AdminSettingsPage() {
                   hint={conPwd && conPwd === newPwd ? "✓ Passwords match" : ""}
                 />
 
-                <SaveRow onSave={savePassword} label="Change Password" />
+                <SaveRow onSave={savePassword} label="Change Password" loading={isSaving} />
               </div>
             </Section>
           )}
 
+            </>
+          )}
         </main>
       </div>
 

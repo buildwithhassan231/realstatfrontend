@@ -1,46 +1,46 @@
-const STATS = [
-  {
-    icon: "🏠",
-    label: "Total Listings",
-    value: "12",
-    change: "+2 this month",
-    positive: true,
-    accent: "bg-blue-50 text-blue-600",
-    iconBg: "bg-blue-100",
-  },
-  {
-    icon: "👁️",
-    label: "Total Views",
-    value: "1,840",
-    change: "+240 this week",
-    positive: true,
-    accent: "bg-purple-50 text-purple-600",
-    iconBg: "bg-purple-100",
-  },
-  {
-    icon: "💬",
-    label: "New Inquiries",
-    value: "5",
-    change: "3 unread",
-    positive: null,
-    accent: "bg-amber-50 text-amber-600",
-    iconBg: "bg-amber-100",
-  },
-  {
-    icon: "✅",
-    label: "Properties Sold",
-    value: "3",
-    change: "+1 this month",
-    positive: true,
-    accent: "bg-emerald-50 text-emerald-600",
-    iconBg: "bg-emerald-100",
-  },
-];
+export default function DashboardStats({ stats }) {
+  const dynamicStats = [
+    {
+      icon: "🏠",
+      label: "Total Listings",
+      value: stats?.stats?.totalProperties?.toString() || "0",
+      change: "All time",
+      positive: null,
+      accent: "bg-blue-50 text-blue-600",
+      iconBg: "bg-blue-100",
+    },
+    {
+      icon: "👁️",
+      label: "Total Views",
+      value: stats?.stats?.totalViews?.toLocaleString() || "0",
+      change: "All time",
+      positive: null,
+      accent: "bg-purple-50 text-purple-600",
+      iconBg: "bg-purple-100",
+    },
+    {
+      icon: "💬",
+      label: "New Inquiries",
+      value: stats?.stats?.totalInquiries?.toString() || "0",
+      change: "All time",
+      positive: null,
+      accent: "bg-amber-50 text-amber-600",
+      iconBg: "bg-amber-100",
+    },
+    {
+      icon: "✅",
+      label: "Properties Sold",
+      value: stats?.statusBreakdown?.sold?.toString() || "0",
+      change: "All time",
+      positive: null,
+      accent: "bg-emerald-50 text-emerald-600",
+      iconBg: "bg-emerald-100",
+    },
+  ];
 
-export default function DashboardStats() {
   return (
     <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-      {STATS.map((s) => (
+      {dynamicStats.map((s) => (
         <div
           key={s.label}
           className="bg-white border border-[#E2E8F0] rounded-2xl p-5 flex items-start gap-4"
